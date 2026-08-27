@@ -1,0 +1,3438 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="dark">
+<title>Operation Color Graph</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' fill='%230a0d13'/%3E%3Cpath d='M2 14 L14 2' stroke='%23e8b04b' stroke-width='2'/%3E%3Cpath d='M2 8 L8 2' stroke='%234ea3e8' stroke-width='2'/%3E%3Cpath d='M8 14 L14 8' stroke='%23e84e7a' stroke-width='2'/%3E%3C/svg%3E">
+<style>/* Operation Color Graph — the chrome is deliberately colourless.
+   Every saturated pixel on screen belongs to the mathematics. */
+:root {
+  --ink: #0a0d13;
+  --panel: #11151e;
+  --panel-2: #171d29;
+  --sunk: #0c1017;
+  --rule: #232c3d;
+  --rule-2: #2f3b51;
+  --text: #ccd5e3;
+  --dim: #737f97;
+  --accent: #e8b04b;
+  --bad: #e07070;
+  --mono: ui-monospace, SFMono-Regular, "SF Mono", "Cascadia Mono",
+          "JetBrains Mono", "IBM Plex Mono", Menlo, Consolas, monospace;
+  --pad: 14px;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  height: 100%;
+  margin: 0;
+  background: var(--ink);
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 12px;
+  -webkit-text-size-adjust: 100%;
+  overscroll-behavior: none;
+}
+
+body {
+  display: grid;
+  grid-template-rows: 40px 1fr;
+  height: 100vh;
+  height: 100dvh;
+  overflow: hidden;
+}
+
+/* ------------------------------------------------------------- header */
+header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 var(--pad);
+  border-bottom: 1px solid var(--rule);
+  background: var(--panel);
+}
+h1 {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 400;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+h1 b { color: var(--accent); font-weight: 400; }
+.spacer { flex: 1; }
+#perf {
+  color: var(--dim);
+  font-variant-numeric: tabular-nums;
+  min-width: 64px;
+  text-align: right;
+}
+
+/* --------------------------------------------------------------- main */
+/* Explicit single rows throughout: #stage holds only absolutely positioned
+   children, so an auto-sized row would collapse the plot to nothing. */
+main {
+  display: grid;
+  grid-template-columns: 316px 1fr;
+  grid-template-rows: 1fr;
+  min-height: 0;
+}
+
+/* -------------------------------------------------------------- panel */
+#panel {
+  min-height: 0;
+  border-right: 1px solid var(--rule);
+  background: var(--panel);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: var(--rule-2) transparent;
+}
+#panel::-webkit-scrollbar { width: 8px; }
+#panel::-webkit-scrollbar-thumb { background: var(--rule-2); }
+
+section {
+  border-bottom: 1px solid var(--rule);
+  padding: 12px var(--pad) 14px;
+}
+section > h2 {
+  margin: 0 0 10px;
+  font-size: 10px;
+  font-weight: 400;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--dim);
+}
+
+.row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.row:last-child { margin-bottom: 0; }
+.row > label:first-child {
+  flex: 0 0 84px;
+  color: var(--dim);
+  font-size: 10px;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+.row .val {
+  flex: 0 0 54px;
+  text-align: right;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+.grow { flex: 1; min-width: 0; }
+
+/* ------------------------------------------------------------ inputs */
+input[type="text"], select {
+  width: 100%;
+  background: var(--sunk);
+  color: var(--text);
+  border: 1px solid var(--rule-2);
+  border-radius: 2px;
+  padding: 6px 7px;
+  font-family: var(--mono);
+  font-size: 12px;
+  appearance: none;
+}
+select {
+  padding-right: 22px;
+  background-image: linear-gradient(45deg, transparent 50%, var(--dim) 50%),
+                    linear-gradient(135deg, var(--dim) 50%, transparent 50%);
+  background-position: calc(100% - 12px) 12px, calc(100% - 8px) 12px;
+  background-size: 4px 4px, 4px 4px;
+  background-repeat: no-repeat;
+}
+select.custom { color: var(--accent); }
+input[type="text"]:focus, select:focus, button:focus-visible, input:focus-visible {
+  outline: 1px solid var(--accent);
+  outline-offset: 1px;
+}
+input[type="text"].bad { border-color: var(--bad); }
+
+#exprField {
+  font-size: 13px;
+  letter-spacing: 0.02em;
+  padding: 8px;
+}
+#exprErr {
+  display: none;
+  margin-top: 6px;
+  color: var(--bad);
+  font-size: 11px;
+  line-height: 1.4;
+}
+#exprErr.on { display: block; }
+
+input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 18px;
+  background: transparent;
+  margin: 0;
+}
+input[type="range"]::-webkit-slider-runnable-track {
+  height: 2px; background: var(--rule-2);
+}
+input[type="range"]::-moz-range-track { height: 2px; background: var(--rule-2); }
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 11px; height: 11px; margin-top: -4.5px;
+  border-radius: 50%; background: var(--accent); border: none;
+}
+input[type="range"]::-moz-range-thumb {
+  width: 11px; height: 11px; border: none;
+  border-radius: 50%; background: var(--accent);
+}
+
+/* Number box paired with every slider: same value, two ways in. */
+input[type="number"].num {
+  flex: 0 0 62px;
+  background: var(--sunk);
+  color: var(--text);
+  border: 1px solid var(--rule-2);
+  border-radius: 2px;
+  padding: 5px 4px 5px 6px;
+  font-family: var(--mono);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+input[type="number"].num::-webkit-inner-spin-button { opacity: 1; height: 22px; }
+
+/* -------------------------------------------------- equation preview */
+#preview {
+  margin-top: 8px;
+  padding: 9px 10px;
+  background: var(--sunk);
+  border: 1px solid var(--rule);
+  border-radius: 2px;
+  cursor: pointer;
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+#preview:hover { border-color: var(--rule-2); }
+#previewMath {
+  font-size: 15px;
+  color: var(--text);
+  min-height: 20px;
+  line-height: 1.35;
+}
+#previewMath math { font-size: 15px; }
+#previewMath.tex {
+  font-family: var(--mono);
+  font-size: 11px;
+  white-space: pre-wrap;
+  word-break: break-all;
+  color: var(--accent);
+}
+#previewPlain {
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px solid var(--rule);
+  color: var(--dim);
+  font-size: 11px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* ------------------------------- value floating beside the pointer */
+#hitLabel {
+  position: absolute;
+  z-index: 5;
+  padding: 3px 7px;
+  background: var(--ink);
+  border: 1px solid var(--accent);
+  border-radius: 2px;
+  color: var(--accent);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity .1s;
+}
+#hitLabel.on { opacity: 1; }
+
+input[type="color"] {
+  width: 34px; height: 24px; padding: 0;
+  border: 1px solid var(--rule-2); border-radius: 2px;
+  background: var(--sunk); cursor: pointer;
+}
+
+.check { display: flex; align-items: center; gap: 8px; cursor: pointer; }
+.check input { accent-color: var(--accent); width: 13px; height: 13px; margin: 0; }
+.check span { color: var(--text); }
+
+button {
+  background: var(--panel-2);
+  color: var(--text);
+  border: 1px solid var(--rule-2);
+  border-radius: 2px;
+  padding: 6px 10px;
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.05em;
+  cursor: pointer;
+}
+button:hover { border-color: var(--dim); }
+button.on { border-color: var(--accent); color: var(--accent); }
+.btns { display: flex; gap: 6px; }
+.btns button { flex: 1; }
+
+details { margin-top: 2px; }
+summary {
+  cursor: pointer;
+  color: var(--dim);
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  list-style: none;
+}
+summary::-webkit-details-marker { display: none; }
+summary::before { content: "+ "; color: var(--accent); }
+details[open] summary::before { content: "\2212 "; }
+.ref { margin-top: 10px; color: var(--dim); font-size: 11px; line-height: 1.65; }
+.ref b { color: var(--text); font-weight: 400; }
+.ref p { margin: 0 0 8px; }
+
+/* --------------------------------------------------------------- plot */
+#plotwrap {
+  position: relative;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  grid-template-rows: 1fr;
+  min-width: 0;
+  min-height: 0;
+}
+#stage {
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  background: #000;
+  cursor: crosshair;
+  touch-action: none;
+}
+#stage.pan { cursor: grab; }
+#stage canvas { position: absolute; inset: 0; display: block; }
+#overlay { pointer-events: none; }
+
+#readout {
+  position: absolute;
+  left: 10px; bottom: 10px;
+  padding: 6px 9px;
+  background: rgba(10, 13, 19, 0.78);
+  border: 1px solid var(--rule);
+  border-radius: 2px;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.55;
+  pointer-events: none;
+  white-space: nowrap;
+}
+#readout b { color: var(--dim); font-weight: 400; }
+.dim { color: var(--dim); }
+
+#note {
+  position: absolute;
+  left: 50%; top: 12px;
+  transform: translate(-50%, -8px);
+  padding: 7px 12px;
+  background: var(--panel-2);
+  border: 1px solid var(--accent);
+  border-radius: 2px;
+  color: var(--text);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .18s, transform .18s;
+  max-width: 80%;
+}
+#note.on { opacity: 1; transform: translate(-50%, 0); }
+
+/* ------------------------------------------------- signature: the rail */
+#railwrap {
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 10px;
+  border-left: 1px solid var(--rule);
+  background: var(--panel);
+  width: 46px;
+}
+#rail {
+  width: 20px;
+  flex: 1;
+  min-height: 0;
+  border: 1px solid var(--rule-2);
+}
+.railcap {
+  font-size: 9px;
+  letter-spacing: 0.06em;
+  color: var(--dim);
+  white-space: nowrap;
+}
+
+/* ------------------------------------------------------------- mobile */
+#panelToggle { display: none; }
+
+@media (max-width: 860px) {
+  main { grid-template-columns: 1fr; }
+  #panelToggle { display: inline-block; }
+  #panel {
+    position: fixed;
+    inset: 40px 0 0 0;
+    z-index: 20;
+    border-right: none;
+    transform: translateY(100%);
+    transition: transform .22s ease;
+  }
+  body.panel-open #panel { transform: translateY(0); }
+  #railwrap { width: 38px; padding: 8px 6px; }
+  .row > label:first-child { flex-basis: 72px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * { transition: none !important; }
+}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Operation <b>Color</b> Graph</h1>
+  <span class="spacer"></span>
+  <span id="perf">—</span>
+  <button id="panelToggle">Controls</button>
+</header>
+
+<main>
+  <div id="panel">
+
+    <section>
+      <h2>Equation</h2>
+      <div class="row"><select id="preset" aria-label="Preset equation"></select></div>
+      <input type="text" id="exprField" spellcheck="false" autocapitalize="off"
+             autocomplete="off" aria-label="Equation" value="x / y">
+      <div id="exprErr" role="alert"></div>
+      <div id="preview" title="How the expression was parsed. Click to see the LaTeX.">
+        <div id="previewMath"></div>
+        <div id="previewPlain"></div>
+      </div>
+      <div id="timeRow" style="display:none">
+        <div class="row">
+          <label>Time t</label>
+          <label class="check"><input type="checkbox" id="animT"><span>Run</span></label>
+          <span class="spacer"></span>
+          <button id="tReset">Reset t</button>
+          <span class="val" id="timeVal">0.00</span>
+        </div>
+        <div class="row">
+          <label>t per second</label>
+          <input type="range" id="tSpeed" class="grow" min="0.01" max="4" step="0.01" value="1">
+          <input type="number" id="tSpeedNum" class="num" min="0.01" max="4" step="0.01" value="1">
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <h2>View</h2>
+      <div class="btns">
+        <button id="navBox">Zoom box</button>
+        <button id="navPan">Pan</button>
+        <button id="reset">Reset</button>
+      </div>
+      <div class="row" style="margin-top:9px">
+        <label class="check"><input type="checkbox" id="grid" checked><span>Axes &amp; grid</span></label>
+      </div>
+    </section>
+
+    <section>
+      <h2>Colour</h2>
+      <div class="row"><select id="palette" aria-label="Colour theme"></select></div>
+      <div class="row" id="duoRow" style="display:none">
+        <label>Two colours</label>
+        <input type="color" id="colA" value="#12224f">
+        <input type="color" id="colB" value="#f3c969">
+      </div>
+      <div class="row" id="bandRow" style="display:none">
+        <label>Bands</label>
+        <input type="range" id="bands" class="grow" min="2" max="24" step="1" value="6">
+        <input type="number" id="bandsNum" class="num" min="2" max="24" step="1" value="6">
+      </div>
+      <div class="row">
+        <label>Cycles / unit</label>
+        <input type="range" id="freq" class="grow" min="0.05" max="16" step="0.05" value="1">
+        <input type="number" id="freqNum" class="num" min="0.05" max="16" step="0.05" value="1">
+      </div>
+      <div class="row">
+        <label>Offset</label>
+        <input type="range" id="phase" class="grow" min="0" max="1" step="0.001" value="0">
+        <input type="number" id="phaseNum" class="num" min="0" max="1" step="0.01" value="0">
+      </div>
+      <div class="row">
+        <label class="check"><input type="checkbox" id="cycle"><span>Rotate colours</span></label>
+      </div>
+      <div class="row" id="speedRow" style="display:none">
+        <label>Turns / second</label>
+        <input type="range" id="speed" class="grow" min="0.01" max="2" step="0.01" value="0.12">
+        <input type="number" id="speedNum" class="num" min="0.01" max="2" step="0.01" value="0.12">
+      </div>
+    </section>
+
+    <section>
+      <h2>Numerical solutions</h2>
+      <div class="row">
+        <label class="check"><input type="checkbox" id="lines"><span>Mark numerical solutions</span></label>
+      </div>
+      <div id="lineOpts" style="display:none">
+        <div class="row">
+          <select id="setKind" class="grow" aria-label="Which numbers to mark"></select>
+          <input type="number" id="setN" class="num" min="0.01" max="24" step="1" value="2"
+                 aria-label="Set parameter" style="display:none">
+        </div>
+        <div class="row">
+          <label>Width</label>
+          <input type="range" id="lineW" class="grow" min="0.4" max="6" step="0.1" value="1.6">
+          <input type="number" id="lineWNum" class="num" min="0.4" max="6" step="0.1" value="1.6">
+        </div>
+        <div class="row" id="parityWrap">
+          <label class="check"><input type="checkbox" id="parity"><span>Split even / odd</span></label>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <h2>Continuation</h2>
+      <div class="row">
+        <select id="cont" aria-label="Continuation mode">
+          <option value="1" selected>Principal branch (real part)</option>
+          <option value="2">Odd reflection</option>
+          <option value="0">Off — leave holes</option>
+        </select>
+      </div>
+      <div class="row">
+        <label class="check"><input type="checkbox" id="repair" checked><span>Fill removable singularities</span></label>
+      </div>
+      <div class="row" id="markRow">
+        <label class="check"><input type="checkbox" id="markCont" checked><span>Hatch continued regions</span></label>
+      </div>
+    </section>
+
+    <section>
+      <h2>Quality</h2>
+      <div class="row">
+        <label>Renderer</label>
+        <select id="backend" class="grow">
+          <option value="auto" selected>Auto</option>
+          <option value="gpu">GPU</option>
+          <option value="cpu">CPU</option>
+        </select>
+      </div>
+      <div class="row">
+        <label>Samples</label>
+        <select id="ss" class="grow">
+          <option value="1" selected>1 per pixel</option>
+          <option value="2">4 per pixel</option>
+          <option value="3">9 per pixel</option>
+        </select>
+      </div>
+      <div class="row">
+        <label class="check"><input type="checkbox" id="aa" checked><span>Band-limit fast regions</span></label>
+      </div>
+      <div class="row"><button id="save" class="grow">Save PNG</button></div>
+    </section>
+
+    <section>
+      <details>
+        <summary>Reference</summary>
+        <div class="ref">
+          <p>Colour is the fractional part of the value. A point <b>(x, y)</b> is painted
+             by <b>z</b>, so the classic views answer "which <b>z</b> solves
+             <b>z op y = x</b>?"</p>
+          <p><b>Variables</b> x, y, r (radius), a (angle), t (time)</p>
+          <p><b>Constants</b> pi, tau, e, phi</p>
+          <p><b>Operators</b> + &minus; * / % ^ and postfix ! &nbsp;·&nbsp;
+             juxtaposition multiplies: <b>2x</b>, <b>3(x+y)</b></p>
+          <p><b>Functions</b> sin cos tan sec csc cot asin acos atan atan2
+             sinh cosh tanh sech csch coth asinh acosh atanh
+             exp log ln log2 log10 logb sqrt cbrt root pow mod
+             abs sign floor ceil round trunc fract hypot min max clamp step
+             smoothstep mix gamma lgamma factorial ncr npr beta erf sinc
+             lambertw gcd lcm</p>
+          <p><b>Solutions</b> mark where z lands on a chosen set of numbers.
+             Hover a contour to thicken it and read its value.</p>
+          <p><b>Mouse</b> drag a box to zoom · shift-drag or middle-drag to pan ·
+             wheel zooms at the pointer · double-click zooms in</p>
+          <p><b>Keys</b> + &minus; zoom · arrows pan · 0 reset · c rotate · l contours · g grid</p>
+        </div>
+      </details>
+    </section>
+
+  </div>
+
+  <div id="plotwrap">
+    <div id="stage">
+      <canvas id="overlay"></canvas>
+      <div id="readout"></div>
+      <div id="note"></div>
+      <div id="hitLabel"></div>
+    </div>
+    <div id="railwrap">
+      <span class="railcap" id="railTop">1.00</span>
+      <canvas id="rail" title="One full turn of the colour ramp, and how much of z it spans"></canvas>
+      <span class="railcap" id="railBot">&#916;z</span>
+    </div>
+  </div>
+</main>
+
+<script>/* =========================================================================
+   Operation Color Graph — core
+   Expression language, dual code generators (JS + GLSL ES 3.00),
+   continuation-aware arithmetic, palettes, presets.
+   No dependencies.
+   ========================================================================= */
+(function (root) {
+  'use strict';
+
+  /* ---------------------------------------------------------------- consts */
+  var BIG = 1e30;        // |v| >= BIG  (or NaN)  ==> "not a usable value"
+  var VBAD = 3e30;       // sentinel returned by helpers on a pole / undefined
+  var TAU = Math.PI * 2;
+
+  /* Continuation modes */
+  var CONT_OFF = 0;      // leave it undefined (holes)
+  var CONT_PRINCIPAL = 1;// real part of the principal complex branch
+  var CONT_REFLECT = 2;  // odd (sign-preserving) real extension
+
+  /* Per-evaluation flags, mirrored by the GLSL globals gCont / gPole. */
+  var RT = { cont: 0, pole: 0, mode: CONT_PRINCIPAL };
+
+  function bad(v) { return !(Math.abs(v) < BIG); }
+
+  /* Lanczos g=7, n=9 — accurate to ~15 digits in float64, plenty in float32. */
+  var LZ = [0.99999999999980993, 676.5203681218851, -1259.1392167224028,
+    771.32342877765313, -176.61502916214059, 12.507343278686905,
+    -0.13857109526572012, 9.9843695780195716e-6, 1.5056327351493116e-7];
+  function lzSum(xx) {
+    var a = LZ[0];
+    for (var i = 1; i < 9; i++) a += LZ[i] / (xx + i);
+    return a;
+  }
+  function lzGamma(x) {                    // x >= 0.5
+    var xx = x - 1, t = xx + 7.5;
+    return 2.5066282746310002 * Math.pow(t, xx + 0.5) * Math.exp(-t) * lzSum(xx);
+  }
+  function lzLogGamma(x) {                 // x >= 0.5
+    var xx = x - 1, t = xx + 7.5;
+    return 0.9189385332046727 + (xx + 0.5) * Math.log(t) - t + Math.log(lzSum(xx));
+  }
+
+  /* ------------------------------------------------- runtime math helpers */
+  /* Every one of these has a line-for-line twin in GLSL_PRELUDE below. */
+  var H = {
+    div: function (a, b) {
+      if (b === 0) { RT.pole = 1; return VBAD; }
+      return a / b;
+    },
+    mod: function (a, b) {
+      if (b === 0) { RT.pole = 1; return VBAD; }
+      return a - b * Math.floor(a / b);
+    },
+    pow: function (a, b) {
+      if (a > 0) return Math.pow(a, b);
+      if (a === 0) {
+        if (b > 0) return 0;
+        if (b === 0) return 1;
+        RT.pole = 1; return VBAD;
+      }
+      var ib = Math.floor(b + 0.5);
+      if (Math.abs(b - ib) < 1e-6) {          // integer exponent: exact in R
+        var m = Math.pow(-a, b);
+        return (Math.abs(ib) % 2 < 0.5) ? m : -m;
+      }
+      if (RT.mode === CONT_OFF) return VBAD;
+      RT.cont = 1;
+      var q = Math.pow(-a, b);
+      if (RT.mode === CONT_PRINCIPAL) return q * Math.cos(Math.PI * b);
+      return -q;
+    },
+    log: function (a) {
+      if (a > 0) return Math.log(a);
+      if (a === 0) { RT.pole = 1; return -VBAD; }
+      if (RT.mode === CONT_OFF) return VBAD;
+      RT.cont = 1;
+      return (RT.mode === CONT_PRINCIPAL) ? Math.log(-a) : -Math.log(-a);
+    },
+    log2: function (a) { return H.log(a) * 1.4426950408889634; },
+    log10: function (a) { return H.log(a) * 0.4342944819032518; },
+    logb: function (b, a) { return H.div(H.log(a), H.log(b)); },
+    sqrt: function (a) {
+      if (a >= 0) return Math.sqrt(a);
+      if (RT.mode === CONT_OFF) return VBAD;
+      RT.cont = 1;
+      return (RT.mode === CONT_PRINCIPAL) ? 0 : -Math.sqrt(-a);
+    },
+    cbrt: function (a) {
+      if (a === 0) return 0;
+      if (a > 0) return Math.pow(a, 1 / 3);
+      var m = Math.pow(-a, 1 / 3);
+      if (RT.mode === CONT_PRINCIPAL) { RT.cont = 1; return m * 0.5; }
+      return -m;                                 // the real cube root
+    },
+    tan: function (x) {
+      var c = Math.cos(x);
+      if (Math.abs(c) < 1e-7) { RT.pole = 1; return VBAD; }
+      return Math.sin(x) / c;
+    },
+    asin: function (x) {
+      if (Math.abs(x) <= 1) return Math.asin(x);
+      if (RT.mode === CONT_OFF) return VBAD;
+      RT.cont = 1; return (x > 0 ? 1 : -1) * (Math.PI * 0.5);
+    },
+    acos: function (x) {
+      if (Math.abs(x) <= 1) return Math.acos(x);
+      if (RT.mode === CONT_OFF) return VBAD;
+      RT.cont = 1; return (x > 0) ? 0 : Math.PI;
+    },
+    acosh: function (x) {
+      if (x >= 1) return Math.log(x + Math.sqrt(x * x - 1));
+      if (RT.mode === CONT_OFF) return VBAD;
+      RT.cont = 1;
+      if (x <= -1) return Math.log(-x + Math.sqrt(x * x - 1));
+      return 0;                                   // |x|<1 -> purely imaginary
+    },
+    atanh: function (x) {
+      var ax = Math.abs(x);
+      if (ax < 1) return 0.5 * Math.log((1 + x) / (1 - x));
+      if (ax === 1) { RT.pole = 1; return VBAD; }
+      if (RT.mode === CONT_OFF) return VBAD;
+      RT.cont = 1;
+      return 0.5 * Math.log((x + 1) / (x - 1));   // = atanh(1/x)
+    },
+    atan2: function (y, x) {
+      if (x === 0 && y === 0) { RT.pole = 1; return VBAD; }
+      return Math.atan2(y, x);
+    },
+    hypot: function (a, b) { return Math.sqrt(a * a + b * b); },
+    fract: function (a) { return a - Math.floor(a); },
+    sign: function (a) { return a > 0 ? 1 : (a < 0 ? -1 : 0); },
+    trunc: function (a) { return a < 0 ? Math.ceil(a) : Math.floor(a); },
+    step: function (e, a) { return a < e ? 0 : 1; },
+    clamp: function (a, lo, hi) { return a < lo ? lo : (a > hi ? hi : a); },
+    mix: function (a, b, s) { return a + (b - a) * s; },
+    smoothstep: function (e0, e1, a) {
+      var s = (a - e0) / (e1 - e0);
+      s = s < 0 ? 0 : (s > 1 ? 1 : s);
+      return s * s * (3 - 2 * s);
+    },
+    gamma: function (x) {
+      if (x >= 0.5) {
+        var g = lzGamma(x);
+        if (!(Math.abs(g) < BIG)) { RT.pole = 1; return VBAD; }
+        return g;
+      }
+      if (Math.abs(x - Math.round(x)) < 1e-9) { RT.pole = 1; return VBAD; }
+      return Math.PI / (Math.sin(Math.PI * x) * lzGamma(1 - x));
+    },
+    lgamma: function (x) {
+      if (x >= 0.5) return lzLogGamma(x);
+      if (Math.abs(x - Math.round(x)) < 1e-9) { RT.pole = 1; return VBAD; }
+      return Math.log(Math.PI / Math.abs(Math.sin(Math.PI * x))) - lzLogGamma(1 - x);
+    },
+    factorial: function (x) { return H.gamma(x + 1); },
+    ncr: function (n, k) {
+      var a = H.gamma(n + 1), b = H.gamma(k + 1), c = H.gamma(n - k + 1);
+      if (bad(a) || bad(b) || bad(c)) return VBAD;
+      return H.div(a, b * c);
+    },
+    npr: function (n, k) {
+      var a = H.gamma(n + 1), c = H.gamma(n - k + 1);
+      if (bad(a) || bad(c)) return VBAD;
+      return H.div(a, c);
+    },
+    beta: function (a, b) {
+      var x = H.gamma(a), y = H.gamma(b), z = H.gamma(a + b);
+      if (bad(x) || bad(y) || bad(z)) return VBAD;
+      return H.div(x * y, z);
+    },
+    erf: function (x) {                    // Abramowitz & Stegun 7.1.26
+      var s = x < 0 ? -1 : 1, ax = Math.abs(x);
+      var t = 1 / (1 + 0.3275911 * ax);
+      var y = 1 - (((((1.061405429 * t - 1.453152027) * t) + 1.421413741) * t
+        - 0.284496736) * t + 0.254829592) * t * Math.exp(-ax * ax);
+      return s * y;
+    },
+    sinc: function (x) {
+      if (Math.abs(x) < 1e-4) return 1 - x * x / 6;
+      return Math.sin(x) / x;
+    },
+    sec: function (x) {
+      var c = Math.cos(x);
+      if (Math.abs(c) < 1e-7) { RT.pole = 1; return VBAD; }
+      return 1 / c;
+    },
+    csc: function (x) {
+      var v = Math.sin(x);
+      if (Math.abs(v) < 1e-7) { RT.pole = 1; return VBAD; }
+      return 1 / v;
+    },
+    cot: function (x) {
+      var v = Math.sin(x);
+      if (Math.abs(v) < 1e-7) { RT.pole = 1; return VBAD; }
+      return Math.cos(x) / v;
+    },
+    sech: function (x) {
+      var c = Math.cosh(x);
+      if (!(Math.abs(c) < BIG)) return 0;
+      return 1 / c;
+    },
+    csch: function (x) {
+      var v = Math.sinh(x);
+      if (Math.abs(v) < 1e-7) { RT.pole = 1; return VBAD; }
+      return 1 / v;
+    },
+    coth: function (x) {
+      var v = Math.sinh(x);
+      if (Math.abs(v) < 1e-7) { RT.pole = 1; return VBAD; }
+      return Math.cosh(x) / v;
+    },
+    lambertw: function (x) {               // principal branch W0
+      if (x < -0.36787944117144233) {
+        if (RT.mode === CONT_OFF) return VBAD;
+        RT.cont = 1; return -1;
+      }
+      var w = x < -0.25 ? -1 + Math.sqrt(Math.max(0, 2 * (1 + Math.E * x)))
+        : Math.log(1 + x);
+      for (var i = 0; i < 24; i++) {
+        var e = Math.exp(w), den = e * (w + 1);
+        if (Math.abs(den) < 1e-12) break;
+        var dw = (w * e - x) / den;
+        w -= dw;
+        if (Math.abs(dw) < 1e-12) break;
+      }
+      return w;
+    },
+    gcd: function (a, b) {
+      var x = Math.abs(Math.round(a)), y = Math.abs(Math.round(b));
+      for (var i = 0; i < 48 && y >= 0.5; i++) { var t = x % y; x = y; y = t; }
+      return x;
+    },
+    lcm: function (a, b) {
+      var g = H.gcd(a, b);
+      if (g < 0.5) { RT.pole = 1; return VBAD; }
+      return Math.abs(Math.round(a) * Math.round(b)) / g;
+    },
+    sinh: Math.sinh, cosh: Math.cosh, tanh: Math.tanh, asinh: Math.asinh,
+    sin: Math.sin, cos: Math.cos, atan: Math.atan, exp: Math.exp,
+    abs: Math.abs, floor: Math.floor, ceil: Math.ceil, round: Math.round,
+    min: Math.min, max: Math.max
+  };
+
+  /* ------------------------------------------------------------ tokenizer */
+  var UNICODE = [
+    [/\u03c0/g, 'pi'], [/\u03c4/g, 'tau'], [/\u221a/g, 'sqrt'],
+    [/[\u00d7\u22c5\u00b7]/g, '*'], [/\u00f7/g, '/'],
+    [/\u2212/g, '-'], [/\u2044/g, '/'],
+    [/\u00b2/g, '^2'], [/\u00b3/g, '^3'],
+    [/[\u201c\u201d\u2018\u2019]/g, '']
+  ];
+
+  function normalize(src) {
+    var s = String(src);
+    for (var i = 0; i < UNICODE.length; i++) s = s.replace(UNICODE[i][0], UNICODE[i][1]);
+    return s;
+  }
+
+  function ParseError(msg, pos) {
+    var e = new Error(msg); e.name = 'ParseError'; e.pos = pos; return e;
+  }
+
+  function tokenize(src) {
+    var toks = [], i = 0, n = src.length;
+    var isD = function (c) { return c >= '0' && c <= '9'; };
+    var isA = function (c) { return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c === '_'; };
+    while (i < n) {
+      var c = src[i];
+      if (c === ' ' || c === '\t' || c === '\n' || c === '\r') { i++; continue; }
+      if (isD(c) || (c === '.' && isD(src[i + 1]))) {
+        var j = i;
+        while (j < n && isD(src[j])) j++;
+        if (src[j] === '.') { j++; while (j < n && isD(src[j])) j++; }
+        if (src[j] === 'e' || src[j] === 'E') {
+          var k = j + 1;
+          if (src[k] === '+' || src[k] === '-') k++;
+          if (isD(src[k])) { while (k < n && isD(src[k])) k++; j = k; }
+        }
+        toks.push({ t: 'num', v: parseFloat(src.slice(i, j)), pos: i });
+        i = j; continue;
+      }
+      if (isA(c)) {
+        var p = i;
+        while (p < n && (isA(src[p]) || isD(src[p]))) p++;
+        toks.push({ t: 'id', v: src.slice(i, p), pos: i });
+        i = p; continue;
+      }
+      if (c === '*' && src[i + 1] === '*') { toks.push({ t: 'op', v: '^', pos: i }); i += 2; continue; }
+      if ('+-*/%^!'.indexOf(c) >= 0) { toks.push({ t: 'op', v: c, pos: i }); i++; continue; }
+      if (c === '(' || c === '[') { toks.push({ t: '(', pos: i }); i++; continue; }
+      if (c === ')' || c === ']') { toks.push({ t: ')', pos: i }); i++; continue; }
+      if (c === ',' || c === ';') { toks.push({ t: ',', pos: i }); i++; continue; }
+      throw ParseError('Unexpected character "' + c + '"', i);
+    }
+    toks.push({ t: 'eof', pos: n });
+    return toks;
+  }
+
+  /* -------------------------------------------------------------- grammar */
+  var FUNCS = {
+    sin: 1, cos: 1, tan: 1, asin: 1, acos: 1, atan: 1,
+    sinh: 1, cosh: 1, tanh: 1, asinh: 1, acosh: 1, atanh: 1,
+    exp: 1, log: 1, log2: 1, log10: 1, sqrt: 1, cbrt: 1,
+    abs: 1, sign: 1, floor: 1, ceil: 1, round: 1, trunc: 1, fract: 1,
+    gamma: 1, lgamma: 1, factorial: 1, erf: 1, sinc: 1,
+    sec: 1, csc: 1, cot: 1, sech: 1, csch: 1, coth: 1, lambertw: 1,
+    atan2: 2, pow: 2, mod: 2, min: 2, max: 2, hypot: 2, logb: 2, step: 2, root: 2,
+    ncr: 2, npr: 2, beta: 2, gcd: 2, lcm: 2,
+    clamp: 3, smoothstep: 3, mix: 3
+  };
+  var FN_ALIAS = {
+    ln: 'log', frac: 'fract', lerp: 'mix', nroot: 'root', nthroot: 'root',
+    arcsin: 'asin', arccos: 'acos', arctan: 'atan',
+    arcsinh: 'asinh', arccosh: 'acosh', arctanh: 'atanh',
+    sgn: 'sign', fact: 'factorial', lngamma: 'lgamma', loggamma: 'lgamma',
+    productlog: 'lambertw', nck: 'ncr', binomial: 'ncr', choose: 'ncr',
+    permutations: 'npr', combinations: 'ncr'
+  };
+  var CONSTS = { pi: Math.PI, tau: TAU, e: Math.E, phi: 1.618033988749895 };
+  var VARS = { x: 1, y: 1, t: 1, r: 1, a: 1 };
+
+  var LBP = { '+': 1, '-': 1, '*': 3, '/': 3, '%': 3, '^': 7 };
+  var RBP = { '+': 2, '-': 2, '*': 4, '/': 4, '%': 4, '^': 6 };
+  var UNARY_BP = 5;
+
+  function parse(input) {
+    var src = normalize(input);
+    var toks = tokenize(src), p = 0;
+
+    function peek() { return toks[p]; }
+    function next() { return toks[p++]; }
+    function expect(t, what) {
+      if (toks[p].t !== t) throw ParseError('Expected ' + what, toks[p].pos);
+      return toks[p++];
+    }
+
+    function startsPrimary(tk) { return tk.t === 'num' || tk.t === 'id' || tk.t === '('; }
+
+    function primary() {
+      var tk = next();
+      if (tk.t === 'num') return { k: 'num', v: tk.v };
+      if (tk.t === '(') {
+        var e = expr(0);
+        expect(')', '")"');
+        return e;
+      }
+      if (tk.t === 'op' && (tk.v === '-' || tk.v === '+')) {
+        var a = expr(UNARY_BP);
+        return tk.v === '-' ? { k: 'neg', a: a } : a;
+      }
+      if (tk.t === 'id') {
+        var name = tk.v.toLowerCase();
+        if (FN_ALIAS[name]) name = FN_ALIAS[name];
+        if (peek().t === '(') {
+          if (!FUNCS[name]) throw ParseError('Unknown function "' + tk.v + '"', tk.pos);
+          next();
+          var args = [];
+          if (peek().t !== ')') {
+            args.push(expr(0));
+            while (peek().t === ',') { next(); args.push(expr(0)); }
+          }
+          expect(')', '")"');
+          if (args.length !== FUNCS[name]) {
+            throw ParseError(name + '() takes ' + FUNCS[name] + ' argument' +
+              (FUNCS[name] > 1 ? 's' : '') + ', got ' + args.length, tk.pos);
+          }
+          return { k: 'call', name: name, args: args };
+        }
+        if (CONSTS.hasOwnProperty(name)) return { k: 'num', v: CONSTS[name] };
+        if (VARS.hasOwnProperty(name)) return { k: 'var', name: name };
+        if (FUNCS[name]) throw ParseError(name + '() needs parentheses', tk.pos);
+        throw ParseError('Unknown name "' + tk.v + '"', tk.pos);
+      }
+      throw ParseError('Unexpected ' + (tk.t === 'eof' ? 'end of expression' : 'token'), tk.pos);
+    }
+
+    function expr(minBp) {
+      var lhs = primary();
+      for (;;) {
+        var tk = peek();
+        if (tk.t === 'op' && tk.v === '!') {
+          /* postfix factorial binds tighter than ^, so 2^3! is 2^(3!) */
+          if (9 < minBp) break;
+          next();
+          lhs = { k: 'call', name: 'factorial', args: [lhs] };
+          continue;
+        }
+        if (tk.t === 'op') {
+          var lb = LBP[tk.v];
+          if (lb === undefined) break;
+          if (lb < minBp) break;
+          next();
+          var rhs = expr(RBP[tk.v]);
+          lhs = { k: 'bin', op: tk.v, l: lhs, r: rhs };
+          continue;
+        }
+        /* implicit multiplication: 2x, 3(x+1), 2sin(x), (x)(y) */
+        if (startsPrimary(tk) && LBP['*'] >= minBp) {
+          var rhs2 = expr(RBP['*']);
+          lhs = { k: 'bin', op: '*', l: lhs, r: rhs2 };
+          continue;
+        }
+        break;
+      }
+      return lhs;
+    }
+
+    var ast = expr(0);
+    if (peek().t !== 'eof') throw ParseError('Unexpected trailing input', peek().pos);
+    return ast;
+  }
+
+  /* -------------------------------------------------------------- analysis */
+  function analyze(ast) {
+    var info = { usesTime: false, usesR: false, usesA: false, nodes: 0 };
+    (function walk(n) {
+      info.nodes++;
+      if (n.k === 'var') {
+        if (n.name === 't') info.usesTime = true;
+        if (n.name === 'r') info.usesR = true;
+        if (n.name === 'a') info.usesA = true;
+      } else if (n.k === 'neg') walk(n.a);
+      else if (n.k === 'bin') { walk(n.l); walk(n.r); }
+      else if (n.k === 'call') for (var i = 0; i < n.args.length; i++) walk(n.args[i]);
+    })(ast);
+    return info;
+  }
+
+  /* ------------------------------------------------------- JS code emitter */
+  /* Direct-call helpers -> plain Math where the domain is unrestricted. */
+  var JS_DIRECT = {
+    sin: 'Math.sin', cos: 'Math.cos', atan: 'Math.atan', exp: 'Math.exp',
+    abs: 'Math.abs', floor: 'Math.floor', ceil: 'Math.ceil', round: 'Math.round',
+    min: 'Math.min', max: 'Math.max', sinh: 'Math.sinh', cosh: 'Math.cosh',
+    tanh: 'Math.tanh', asinh: 'Math.asinh'
+  };
+
+  function jsExpr(n) {
+    switch (n.k) {
+      case 'num': return numLit(n.v);
+      case 'var': return n.name === 't' ? 't' : n.name;
+      case 'neg': return '(-' + jsExpr(n.a) + ')';
+      case 'bin': {
+        var l = jsExpr(n.l), r = jsExpr(n.r);
+        if (n.op === '+' || n.op === '-' || n.op === '*') return '(' + l + n.op + r + ')';
+        if (n.op === '/') return 'H.div(' + l + ',' + r + ')';
+        if (n.op === '%') return 'H.mod(' + l + ',' + r + ')';
+        return 'H.pow(' + l + ',' + r + ')';
+      }
+      case 'call': {
+        var A = n.args.map(jsExpr);
+        if (n.name === 'root') return 'H.pow(' + A[0] + ',H.div(1,' + A[1] + '))';
+        if (JS_DIRECT[n.name]) return JS_DIRECT[n.name] + '(' + A.join(',') + ')';
+        return 'H.' + n.name + '(' + A.join(',') + ')';
+      }
+    }
+    throw new Error('bad node');
+  }
+
+  function numLit(v) {
+    if (!isFinite(v)) return v > 0 ? '1e300' : '-1e300';
+    var s = String(v);
+    return v < 0 ? '(' + s + ')' : s;
+  }
+
+  /* Closure-tree fallback for environments where new Function is blocked. */
+  function closureTree(n) {
+    switch (n.k) {
+      case 'num': { var v = n.v; return function () { return v; }; }
+      case 'var':
+        switch (n.name) {
+          case 'x': return function (x) { return x; };
+          case 'y': return function (x, y) { return y; };
+          case 't': return function (x, y, t) { return t; };
+          case 'r': return function (x, y, t, r) { return r; };
+          default: return function (x, y, t, r, a) { return a; };
+        }
+      case 'neg': {
+        var f = closureTree(n.a);
+        return function (x, y, t, r, a) { return -f(x, y, t, r, a); };
+      }
+      case 'bin': {
+        var L = closureTree(n.l), R = closureTree(n.r);
+        switch (n.op) {
+          case '+': return function (x, y, t, r, a) { return L(x, y, t, r, a) + R(x, y, t, r, a); };
+          case '-': return function (x, y, t, r, a) { return L(x, y, t, r, a) - R(x, y, t, r, a); };
+          case '*': return function (x, y, t, r, a) { return L(x, y, t, r, a) * R(x, y, t, r, a); };
+          case '/': return function (x, y, t, r, a) { return H.div(L(x, y, t, r, a), R(x, y, t, r, a)); };
+          case '%': return function (x, y, t, r, a) { return H.mod(L(x, y, t, r, a), R(x, y, t, r, a)); };
+          default: return function (x, y, t, r, a) { return H.pow(L(x, y, t, r, a), R(x, y, t, r, a)); };
+        }
+      }
+      case 'call': {
+        var A = n.args.map(closureTree), name = n.name;
+        if (name === 'root') {
+          return function (x, y, t, r, a) { return H.pow(A[0](x, y, t, r, a), H.div(1, A[1](x, y, t, r, a))); };
+        }
+        var fn = H[name];
+        if (A.length === 1) return function (x, y, t, r, a) { return fn(A[0](x, y, t, r, a)); };
+        if (A.length === 2) return function (x, y, t, r, a) { return fn(A[0](x, y, t, r, a), A[1](x, y, t, r, a)); };
+        return function (x, y, t, r, a) { return fn(A[0](x, y, t, r, a), A[1](x, y, t, r, a), A[2](x, y, t, r, a)); };
+      }
+    }
+    throw new Error('bad node');
+  }
+
+  function compileJS(ast) {
+    var body = 'return ' + jsExpr(ast) + ';';
+    try {
+      /* eslint-disable no-new-func */
+      var f = new Function('x', 'y', 't', 'r', 'a', 'H', body);
+      return function (x, y, t, r, a) { return f(x, y, t, r, a, H); };
+    } catch (err) {
+      return closureTree(ast);
+    }
+  }
+
+  /* ----------------------------------------------------- GLSL code emitter */
+  var GLSL_DIRECT = {
+    sin: 'sin', cos: 'cos', atan: 'atan', exp: 'exp', abs: 'abs', sign: 'sign',
+    floor: 'floor', ceil: 'ceil', round: 'round', trunc: 'trunc', fract: 'fract',
+    min: 'min', max: 'max', sinh: 'sinh', cosh: 'cosh', tanh: 'tanh', asinh: 'asinh',
+    clamp: 'clamp', smoothstep: 'smoothstep', mix: 'mix', step: 'step'
+  };
+  var GLSL_HELPER = {
+    tan: 'c_tan', asin: 'c_asin', acos: 'c_acos', acosh: 'c_acosh', atanh: 'c_atanh',
+    log: 'c_log', log2: 'c_log2', log10: 'c_log10', logb: 'c_logb',
+    sqrt: 'c_sqrt', cbrt: 'c_cbrt', pow: 'c_pow', mod: 'c_mod',
+    atan2: 'c_atan2', hypot: 'c_hypot',
+    gamma: 'c_gamma', lgamma: 'c_lgamma', factorial: 'c_factorial',
+    ncr: 'c_ncr', npr: 'c_npr', beta: 'c_beta', erf: 'c_erf', sinc: 'c_sinc',
+    sec: 'c_sec', csc: 'c_csc', cot: 'c_cot', sech: 'c_sech', csch: 'c_csch',
+    coth: 'c_coth', lambertw: 'c_lambertw', gcd: 'c_gcd', lcm: 'c_lcm'
+  };
+
+  function glslNum(v) {
+    if (!isFinite(v)) return v > 0 ? '1e30' : '(-1e30)';
+    var s;
+    if (Math.abs(v) >= 1e-4 && Math.abs(v) < 1e7) {
+      s = v.toFixed(8).replace(/0+$/, '');
+      if (s[s.length - 1] === '.') s += '0';
+    } else {
+      s = v.toExponential(8);
+      if (s.indexOf('.') < 0) s = s.replace('e', '.0e');
+    }
+    return v < 0 ? '(' + s + ')' : s;
+  }
+
+  function emitGLSL(ast, used) {
+    used = used || {};
+    function mark(f) { used[f] = true; return f; }
+    function go(n) {
+      switch (n.k) {
+        case 'num': return glslNum(n.v);
+        case 'var': return n.name === 't' ? 'uTime' : n.name;
+        case 'neg': return '(-' + go(n.a) + ')';
+        case 'bin': {
+          var l = go(n.l), r = go(n.r);
+          if (n.op === '+' || n.op === '-' || n.op === '*') return '(' + l + n.op + r + ')';
+          if (n.op === '/') return mark('c_div') + '(' + l + ',' + r + ')';
+          if (n.op === '%') return mark('c_mod') + '(' + l + ',' + r + ')';
+          return mark('c_pow') + '(' + l + ',' + r + ')';
+        }
+        case 'call': {
+          var A = n.args.map(go);
+          if (n.name === 'root') {
+            return mark('c_pow') + '(' + A[0] + ',' + mark('c_div') + '(1.0,' + A[1] + '))';
+          }
+          if (GLSL_HELPER[n.name]) return mark(GLSL_HELPER[n.name]) + '(' + A.join(',') + ')';
+          if (GLSL_DIRECT[n.name]) return GLSL_DIRECT[n.name] + '(' + A.join(',') + ')';
+          throw new Error('no GLSL mapping for ' + n.name);
+        }
+      }
+      throw new Error('bad node');
+    }
+    return { src: go(ast), used: used };
+  }
+
+  /* GLSL twins of the H.* helpers.  Kept literally parallel on purpose:
+     if you change one, change the other. */
+  var GLSL_PRELUDE = [
+    'const float PI = 3.1415926535897932;',
+    'const float BIG = 1e30;',
+    'const float VBAD = 3.0e30;',
+    'float gCont; float gPole;',
+    '',
+    'float c_div(float a, float b){ if (b == 0.0){ gPole = 1.0; return VBAD; } return a / b; }',
+    'float c_mod(float a, float b){ if (b == 0.0){ gPole = 1.0; return VBAD; } return a - b * floor(a / b); }',
+    'float c_pow(float a, float b){',
+    '  if (a > 0.0) return pow(a, b);',
+    '  if (a == 0.0){ if (b > 0.0) return 0.0; if (b == 0.0) return 1.0; gPole = 1.0; return VBAD; }',
+    '  float ib = floor(b + 0.5);',
+    '  if (abs(b - ib) < 1e-6){ float m = pow(-a, b); return (mod(abs(ib), 2.0) < 0.5) ? m : -m; }',
+    '  if (uCont == 0) return VBAD;',
+    '  gCont = 1.0;',
+    '  float q = pow(-a, b);',
+    '  if (uCont == 1) return q * cos(PI * b);',
+    '  return -q;',
+    '}',
+    'float c_log(float a){',
+    '  if (a > 0.0) return log(a);',
+    '  if (a == 0.0){ gPole = 1.0; return -VBAD; }',
+    '  if (uCont == 0) return VBAD;',
+    '  gCont = 1.0;',
+    '  return (uCont == 1) ? log(-a) : -log(-a);',
+    '}',
+    'float c_log2(float a){ return c_log(a) * 1.4426950408889634; }',
+    'float c_log10(float a){ return c_log(a) * 0.4342944819032518; }',
+    'float c_logb(float b, float a){ return c_div(c_log(a), c_log(b)); }',
+    'float c_sqrt(float a){',
+    '  if (a >= 0.0) return sqrt(a);',
+    '  if (uCont == 0) return VBAD;',
+    '  gCont = 1.0;',
+    '  return (uCont == 1) ? 0.0 : -sqrt(-a);',
+    '}',
+    'float c_cbrt(float a){',
+    '  if (a == 0.0) return 0.0;',
+    '  if (a > 0.0) return pow(a, 0.3333333333333333);',
+    '  float m = pow(-a, 0.3333333333333333);',
+    '  if (uCont == 1){ gCont = 1.0; return m * 0.5; }',
+    '  return -m;',
+    '}',
+    'float c_tan(float x){',
+    '  float c = cos(x);',
+    '  if (abs(c) < 1e-7){ gPole = 1.0; return VBAD; }',
+    '  return sin(x) / c;',
+    '}',
+    'float c_asin(float x){',
+    '  if (abs(x) <= 1.0) return asin(x);',
+    '  if (uCont == 0) return VBAD;',
+    '  gCont = 1.0; return sign(x) * (PI * 0.5);',
+    '}',
+    'float c_acos(float x){',
+    '  if (abs(x) <= 1.0) return acos(x);',
+    '  if (uCont == 0) return VBAD;',
+    '  gCont = 1.0; return (x > 0.0) ? 0.0 : PI;',
+    '}',
+    'float c_acosh(float x){',
+    '  if (x >= 1.0) return log(x + sqrt(x*x - 1.0));',
+    '  if (uCont == 0) return VBAD;',
+    '  gCont = 1.0;',
+    '  if (x <= -1.0) return log(-x + sqrt(x*x - 1.0));',
+    '  return 0.0;',
+    '}',
+    'float c_atanh(float x){',
+    '  float ax = abs(x);',
+    '  if (ax < 1.0) return 0.5 * log((1.0 + x) / (1.0 - x));',
+    '  if (ax == 1.0){ gPole = 1.0; return VBAD; }',
+    '  if (uCont == 0) return VBAD;',
+    '  gCont = 1.0;',
+    '  return 0.5 * log((x + 1.0) / (x - 1.0));',
+    '}',
+    'float c_atan2(float yy, float xx){',
+    '  if (xx == 0.0 && yy == 0.0){ gPole = 1.0; return VBAD; }',
+    '  return atan(yy, xx);',
+    '}',
+    'float c_hypot(float a, float b){ return sqrt(a*a + b*b); }',
+    'float lzSum(float xx){',
+    '  float a = 0.99999999999980993;',
+    '  a += 676.5203681218851 / (xx + 1.0);',
+    '  a += -1259.1392167224028 / (xx + 2.0);',
+    '  a += 771.32342877765313 / (xx + 3.0);',
+    '  a += -176.61502916214059 / (xx + 4.0);',
+    '  a += 12.507343278686905 / (xx + 5.0);',
+    '  a += -0.13857109526572012 / (xx + 6.0);',
+    '  a += 9.9843695780195716e-6 / (xx + 7.0);',
+    '  a += 1.5056327351493116e-7 / (xx + 8.0);',
+    '  return a;',
+    '}',
+    'float lzGamma(float x){ float xx = x - 1.0, t = xx + 7.5;',
+    '  return 2.5066282746310002 * pow(t, xx + 0.5) * exp(-t) * lzSum(xx); }',
+    'float lzLogGamma(float x){ float xx = x - 1.0, t = xx + 7.5;',
+    '  return 0.9189385332046727 + (xx + 0.5) * log(t) - t + log(lzSum(xx)); }',
+    'float c_gamma(float x){',
+    '  if (x >= 0.5){',
+    '    float g = lzGamma(x);',
+    '    if (!(abs(g) < BIG)){ gPole = 1.0; return VBAD; }',
+    '    return g;',
+    '  }',
+    '  if (abs(x - floor(x + 0.5)) < 1e-6){ gPole = 1.0; return VBAD; }',
+    '  return PI / (sin(PI * x) * lzGamma(1.0 - x));',
+    '}',
+    'float c_lgamma(float x){',
+    '  if (x >= 0.5) return lzLogGamma(x);',
+    '  if (abs(x - floor(x + 0.5)) < 1e-6){ gPole = 1.0; return VBAD; }',
+    '  return log(PI / abs(sin(PI * x))) - lzLogGamma(1.0 - x);',
+    '}',
+    'float c_factorial(float x){ return c_gamma(x + 1.0); }',
+    'float c_ncr(float n, float k){',
+    '  float a = c_gamma(n + 1.0), b = c_gamma(k + 1.0), c = c_gamma(n - k + 1.0);',
+    '  if (!(abs(a) < BIG) || !(abs(b) < BIG) || !(abs(c) < BIG)) return VBAD;',
+    '  return c_div(a, b * c);',
+    '}',
+    'float c_npr(float n, float k){',
+    '  float a = c_gamma(n + 1.0), c = c_gamma(n - k + 1.0);',
+    '  if (!(abs(a) < BIG) || !(abs(c) < BIG)) return VBAD;',
+    '  return c_div(a, c);',
+    '}',
+    'float c_beta(float a, float b){',
+    '  float x = c_gamma(a), y = c_gamma(b), z = c_gamma(a + b);',
+    '  if (!(abs(x) < BIG) || !(abs(y) < BIG) || !(abs(z) < BIG)) return VBAD;',
+    '  return c_div(x * y, z);',
+    '}',
+    'float c_erf(float x){',
+    '  float s = (x < 0.0) ? -1.0 : 1.0;',
+    '  float ax = abs(x);',
+    '  float t = 1.0 / (1.0 + 0.3275911 * ax);',
+    '  float y = 1.0 - (((((1.061405429*t - 1.453152027)*t) + 1.421413741)*t',
+    '            - 0.284496736)*t + 0.254829592) * t * exp(-ax*ax);',
+    '  return s * y;',
+    '}',
+    'float c_sinc(float x){ if (abs(x) < 1e-4) return 1.0 - x*x/6.0; return sin(x)/x; }',
+    'float c_sec(float x){ float c = cos(x); if (abs(c) < 1e-7){ gPole = 1.0; return VBAD; } return 1.0/c; }',
+    'float c_csc(float x){ float v = sin(x); if (abs(v) < 1e-7){ gPole = 1.0; return VBAD; } return 1.0/v; }',
+    'float c_cot(float x){ float v = sin(x); if (abs(v) < 1e-7){ gPole = 1.0; return VBAD; } return cos(x)/v; }',
+    'float c_sech(float x){ float c = cosh(x); if (!(abs(c) < BIG)) return 0.0; return 1.0/c; }',
+    'float c_csch(float x){ float v = sinh(x); if (abs(v) < 1e-7){ gPole = 1.0; return VBAD; } return 1.0/v; }',
+    'float c_coth(float x){ float v = sinh(x); if (abs(v) < 1e-7){ gPole = 1.0; return VBAD; } return cosh(x)/v; }',
+    'float c_lambertw(float x){',
+    '  if (x < -0.36787944117144233){',
+    '    if (uCont == 0) return VBAD;',
+    '    gCont = 1.0; return -1.0;',
+    '  }',
+    '  float w = (x < -0.25) ? (-1.0 + sqrt(max(0.0, 2.0 * (1.0 + 2.718281828459045 * x))))',
+    '                        : log(1.0 + x);',
+    '  for (int i = 0; i < 24; i++){',
+    '    float e = exp(w);',
+    '    float den = e * (w + 1.0);',
+    '    if (abs(den) < 1e-12) break;',
+    '    float dw = (w * e - x) / den;',
+    '    w -= dw;',
+    '    if (abs(dw) < 1e-7) break;',
+    '  }',
+    '  return w;',
+    '}',
+    'float c_gcd(float a, float b){',
+    '  float x = abs(floor(a + 0.5)), y = abs(floor(b + 0.5));',
+    '  for (int i = 0; i < 48; i++){',
+    '    if (y < 0.5) break;',
+    '    float t = x - y * floor(x / y);',
+    '    x = y; y = t;',
+    '  }',
+    '  return x;',
+    '}',
+    'float c_lcm(float a, float b){',
+    '  float g = c_gcd(a, b);',
+    '  if (g < 0.5){ gPole = 1.0; return VBAD; }',
+    '  return abs(floor(a + 0.5) * floor(b + 0.5)) / g;',
+    '}'
+  ].join('\n');
+
+  /* ------------------------------------------------------------- palettes */
+  /* Every palette is a cyclic (or deliberately seamed) map [0,1) -> rgb.
+     JS is the source of truth; GLSL_PALETTE mirrors it exactly. */
+  function hsl2rgb(h, s, l) {
+    var a = s * Math.min(l, 1 - l);
+    function f(n) {
+      var k = (n + h * 12) % 12; if (k < 0) k += 12;
+      return l - a * Math.max(-1, Math.min(k - 3, 9 - k, 1));
+    }
+    return [f(0), f(8), f(4)];
+  }
+  function tri(u) { return 1 - Math.abs(2 * u - 1); }
+  function mix3(A, B, s) {
+    return [A[0] + (B[0] - A[0]) * s, A[1] + (B[1] - A[1]) * s, A[2] + (B[2] - A[2]) * s];
+  }
+  function ramp(stops, s) {
+    var n = stops.length - 1, i = Math.min(n - 1, Math.floor(s * n));
+    return mix3(stops[i], stops[i + 1], s * n - i);
+  }
+  /* dark plum -> blue -> white -> red -> dark plum: two hues, one endpoint */
+  var TWILIGHT = [[0.10, 0.06, 0.20], [0.20, 0.36, 0.72], [0.97, 0.96, 0.93], [0.72, 0.22, 0.26], [0.10, 0.06, 0.20]];
+  var EMBER = [[0.03, 0.01, 0.06], [0.45, 0.05, 0.16], [0.88, 0.28, 0.05], [0.99, 0.79, 0.28], [1, 1, 0.94]];
+  var ICE = [[0.02, 0.03, 0.10], [0.06, 0.24, 0.48], [0.13, 0.60, 0.72], [0.55, 0.88, 0.87], [0.96, 0.99, 1]];
+
+  var PALETTES = [
+    { id: 'spectrum', name: 'Spectrum', cyclic: true, duo: false },
+    { id: 'soft', name: 'Spectrum soft', cyclic: true, duo: false },
+    { id: 'cosine', name: 'Cosine', cyclic: true, duo: false },
+    { id: 'twilight', name: 'Twilight', cyclic: true, duo: false },
+    { id: 'ember', name: 'Ember', cyclic: true, duo: false },
+    { id: 'ice', name: 'Ice', cyclic: true, duo: false },
+    { id: 'mono', name: 'Mono', cyclic: true, duo: false },
+    { id: 'duotone', name: 'Duotone (seamed)', cyclic: false, duo: true },
+    { id: 'duosmooth', name: 'Duotone (smooth)', cyclic: true, duo: true },
+    { id: 'twotone', name: 'Two-tone', cyclic: false, duo: true },
+    { id: 'bands', name: 'Bands', cyclic: false, duo: false }
+  ];
+
+  function paletteRGB(idx, u, A, B, bands) {
+    switch (idx) {
+      case 0: return hsl2rgb(u, 1, 0.5);
+      case 1: return hsl2rgb(u, 0.62, 0.6);
+      case 2: return [
+        0.5 + 0.5 * Math.cos(TAU * (u + 0.0)),
+        0.5 + 0.5 * Math.cos(TAU * (u + 0.33)),
+        0.5 + 0.5 * Math.cos(TAU * (u + 0.67))
+      ];
+      case 3: return ramp(TWILIGHT, u);
+      case 4: return ramp(EMBER, tri(u));
+      case 5: return ramp(ICE, tri(u));
+      case 6: { var g = tri(u); return [g, g, g]; }
+      case 7: return mix3(A, B, u);
+      case 8: return mix3(A, B, tri(u));
+      case 9: return u < 0.5 ? A : B;
+      default: {
+        var n = Math.max(2, bands | 0);
+        return hsl2rgb(Math.floor(u * n) / n, 1, 0.5);
+      }
+    }
+  }
+
+  function paletteMean(idx, A, B, bands) {
+    var r = 0, g = 0, b = 0, N = 96;
+    for (var i = 0; i < N; i++) {
+      var c = paletteRGB(idx, (i + 0.5) / N, A, B, bands);
+      r += c[0]; g += c[1]; b += c[2];
+    }
+    return [r / N, g / N, b / N];
+  }
+
+  var GLSL_PALETTE = [
+    'vec3 hsl2rgb(float h, float s, float l){',
+    '  vec3 k = mod(vec3(0.0, 8.0, 4.0) + h * 12.0, 12.0);',
+    '  float a = s * min(l, 1.0 - l);',
+    '  return l - a * clamp(min(k - 3.0, 9.0 - k), -1.0, 1.0);',
+    '}',
+    'float tri(float u){ return 1.0 - abs(2.0 * u - 1.0); }',
+    'vec3 ramp5(vec3 c0, vec3 c1, vec3 c2, vec3 c3, vec3 c4, float s){',
+    '  float f = clamp(s, 0.0, 1.0) * 4.0;',
+    '  float i = min(floor(f), 3.0);',
+    '  float k = f - i;',
+    '  vec3 a = (i < 0.5) ? c0 : ((i < 1.5) ? c1 : ((i < 2.5) ? c2 : c3));',
+    '  vec3 b = (i < 0.5) ? c1 : ((i < 1.5) ? c2 : ((i < 2.5) ? c3 : c4));',
+    '  return mix(a, b, k);',
+    '}',
+    'vec3 palette(float u){',
+    '  if (uPalette == 0) return hsl2rgb(u, 1.0, 0.5);',
+    '  if (uPalette == 1) return hsl2rgb(u, 0.62, 0.6);',
+    '  if (uPalette == 2) return 0.5 + 0.5 * cos(6.283185307 * (u + vec3(0.0, 0.33, 0.67)));',
+    '  if (uPalette == 3) return ramp5(vec3(0.10,0.06,0.20), vec3(0.20,0.36,0.72), vec3(0.97,0.96,0.93), vec3(0.72,0.22,0.26), vec3(0.10,0.06,0.20), u);',
+    '  if (uPalette == 4) return ramp5(vec3(0.03,0.01,0.06), vec3(0.45,0.05,0.16), vec3(0.88,0.28,0.05), vec3(0.99,0.79,0.28), vec3(1.0,1.0,0.94), tri(u));',
+    '  if (uPalette == 5) return ramp5(vec3(0.02,0.03,0.10), vec3(0.06,0.24,0.48), vec3(0.13,0.60,0.72), vec3(0.55,0.88,0.87), vec3(0.96,0.99,1.0), tri(u));',
+    '  if (uPalette == 6) return vec3(tri(u));',
+    '  if (uPalette == 7) return mix(uColA, uColB, u);',
+    '  if (uPalette == 8) return mix(uColA, uColB, tri(u));',
+    '  if (uPalette == 9) return (u < 0.5) ? uColA : uColB;',
+    '  float n = max(2.0, float(uBands));',
+    '  return hsl2rgb(floor(u * n) / n, 1.0, 0.5);',
+    '}'
+  ].join('\n');
+
+  /* --------------------------------------------------------------- presets */
+  /* The canvas answers: "what z solves op(z, y) = x?"  Colour = frac(z). */
+  var PRESETS = [
+    {
+      group: 'Arithmetic', items: [
+        { name: 'Addition — z + y = x', expr: 'x - y', ppu: 84 },
+        { name: 'Subtraction — z − y = x', expr: 'x + y', ppu: 84 },
+        { name: 'Multiplication — z · y = x', expr: 'x / y', ppu: 84 },
+        { name: 'Division — z ÷ y = x', expr: 'x * y', ppu: 84 },
+        { name: 'Modulo — z mod y', expr: 'mod(x, y)', ppu: 60 }
+      ]
+    },
+    {
+      group: 'Powers & logs', items: [
+        { name: 'Exponentiation — z^y = x', expr: 'root(x, y)', ppu: 84 },
+        { name: 'Logarithm — y^z = x', expr: 'logb(y, x)', ppu: 60 },
+        { name: 'Power surface', expr: 'x ^ y', ppu: 84 },
+        { name: 'Geometric mean', expr: 'sqrt(x * y)', ppu: 60 },
+        { name: 'Tetration step', expr: 'x ^ (1 / x) * y', ppu: 70 }
+      ]
+    },
+    {
+      group: 'Trigonometric', items: [
+        { name: 'Sine sum', expr: 'sin(x) + cos(y)', ppu: 40 },
+        { name: 'Sine product', expr: 'sin(x * y)', ppu: 50 },
+        { name: 'Tangent field', expr: 'tan(x * y)', ppu: 60 },
+        { name: 'Tangent addition', expr: '(x + y) / (1 - x * y)', ppu: 90 },
+        { name: 'Ripples', expr: 'sin(3 r)', ppu: 30 },
+        { name: 'Polar rays', expr: '3 a / pi', ppu: 60 },
+        { name: 'Log spiral', expr: 'a / tau + log(r)', ppu: 45 },
+        { name: 'Interference', expr: 'sin(x^2 - y^2)', ppu: 55 },
+        { name: 'Nested arcsine', expr: 'asin(sin(x) cos(y)) 2', ppu: 35 },
+        { name: 'Rotating wave (uses t)', expr: 'sin(2x + t) + cos(2y - t)', ppu: 40 }
+      ]
+    },
+    {
+      group: 'Poles & rationals', items: [
+        { name: 'Harmonic mean', expr: '2 x y / (x + y)', ppu: 70 },
+        { name: 'Hyperbolic sheet', expr: '1 / (x * y)', ppu: 80 },
+        { name: 'Circle inversion', expr: 'x / (x^2 + y^2)', ppu: 70 },
+        { name: 'Difference of squares', expr: '(x^2 - y^2) / (x y)', ppu: 70 },
+        { name: 'Möbius', expr: '(x + 1) / (y - 1)', ppu: 70 }
+      ]
+    },
+    {
+      group: 'Special functions', items: [
+        { name: 'Factorial difference', expr: 'x! - y!', ppu: 60 },
+        { name: 'Binomial', expr: 'ncr(x, y)', ppu: 40 },
+        { name: 'Gamma product', expr: 'gamma(x) gamma(y)', ppu: 45 },
+        { name: 'Log-gamma sum', expr: 'lgamma(x) + lgamma(y)', ppu: 40 },
+        { name: 'Beta surface', expr: 'beta(x, y)', ppu: 45 },
+        { name: 'Lambert W', expr: 'lambertw(x y)', ppu: 55 },
+        { name: 'Error function', expr: '4 erf(x) erf(y)', ppu: 40 },
+        { name: 'Sinc lattice', expr: '6 sinc(x) sinc(y)', ppu: 22 },
+        { name: 'Greatest common divisor', expr: 'gcd(x, y)', ppu: 18 },
+        { name: 'Secant lattice', expr: 'sec(x) + csc(y)', ppu: 50 }
+      ]
+    },
+    {
+      group: 'Surfaces', items: [
+        { name: 'Saddle', expr: 'x^2 - y^2', ppu: 55 },
+        { name: 'Radius', expr: 'r', ppu: 60 },
+        { name: 'Gaussian ridge', expr: '8 exp(-(x^2 + y^2))', ppu: 60 },
+        { name: 'Hyperbolic tangent mix', expr: '4 tanh(x) tanh(y)', ppu: 55 },
+        { name: 'Log radius', expr: 'log(x^2 + y^2)', ppu: 50 }
+      ]
+    }
+  ];
+
+  /* ---------------------------------------------------------------- export */
+  var API = {
+    BIG: BIG, VBAD: VBAD, TAU: TAU,
+    CONT_OFF: CONT_OFF, CONT_PRINCIPAL: CONT_PRINCIPAL, CONT_REFLECT: CONT_REFLECT,
+    RT: RT, H: H, bad: bad,
+    normalize: normalize, tokenize: tokenize, parse: parse, analyze: analyze,
+    compileJS: compileJS, closureTree: closureTree, emitGLSL: emitGLSL, glslNum: glslNum,
+    GLSL_PRELUDE: GLSL_PRELUDE, GLSL_PALETTE: GLSL_PALETTE,
+    PALETTES: PALETTES, paletteRGB: paletteRGB, paletteMean: paletteMean,
+    hsl2rgb: hsl2rgb, tri: tri,
+    PRESETS: PRESETS, FUNCS: FUNCS, FN_ALIAS: FN_ALIAS, CONSTS: CONSTS, VARS: VARS
+  };
+
+  if (typeof module === 'object' && module.exports) module.exports = API;
+  root.OCG = API;
+})(typeof globalThis !== 'undefined' ? globalThis : this);
+</script>
+<script>/* =========================================================================
+   Operation Color Graph — contour number sets
+   For a field value v, find the nearest member of the chosen set. The shader
+   then measures |v - member| against the local gradient to draw a contour of
+   constant screen width. JS is the source of truth; GLSL_SETS mirrors it.
+   ========================================================================= */
+(function (root) {
+  'use strict';
+
+  /* parity: can the set's members be split cleanly into even and odd?
+     param:  label for the companion number box, or null if the set takes none */
+  var SETS = [
+    { id: 'whole', name: 'Whole numbers', parity: true, param: null, def: 1 },
+    { id: 'multiples', name: 'Multiples of n', parity: true, param: 'n', def: 0.5 },
+    { id: 'powers', name: 'Powers of n', parity: true, param: 'n', def: 2 },
+    { id: 'primes', name: 'Prime numbers', parity: false, param: null, def: 1 },
+    { id: 'squares', name: 'Perfect squares', parity: true, param: null, def: 1 },
+    { id: 'triangular', name: 'Triangular numbers', parity: true, param: null, def: 1 },
+    { id: 'fibonacci', name: 'Fibonacci numbers', parity: true, param: null, def: 1 },
+    { id: 'factorials', name: 'Factorials', parity: true, param: null, def: 1 },
+    { id: 'fractions', name: 'Fractions, denominator \u2264 n', parity: false, param: 'n', def: 8 }
+  ];
+
+  var PRIME_MAX = 33000, FACT_MAX = 10, FIB_MAX = 1e7;
+
+  function isPrime(x) {
+    if (x < 2 || x > PRIME_MAX) return false;
+    if (x < 4) return true;
+    if (x % 2 === 0) return false;
+    for (var i = 3; i * i <= x; i += 2) if (x % i === 0) return false;
+    return true;
+  }
+  function fibIndex(x) {          // -1 when x is not a Fibonacci number
+    if (x < 0 || x > FIB_MAX) return -1;
+    var a = 0, b = 1;
+    for (var i = 0; i < 40; i++) {
+      if (Math.abs(a - x) < 0.5) return i;
+      if (a > x) return -1;
+      var t = a + b; a = b; b = t;
+    }
+    return -1;
+  }
+  function factIndex(x) {
+    if (x < 1) return -1;
+    var f = 1;
+    for (var i = 0; i <= FACT_MAX; i++) {
+      if (i > 1) f *= i;
+      if (Math.abs(f - x) < 0.5) return i;
+      if (f > x) return -1;
+    }
+    return -1;
+  }
+  function sup(n) {               // 4 -> superscript "4"
+    var d = '\u2070\u00b9\u00b2\u00b3\u2074\u2075\u2076\u2077\u2078\u2079';
+    var s = String(Math.abs(n)).split('').map(function (c) { return d[+c]; }).join('');
+    return (n < 0 ? '\u207b' : '') + s;
+  }
+  function trim(v) {
+    if (!isFinite(v)) return '\u221e';
+    if (Math.abs(v) >= 1e7 || (v !== 0 && Math.abs(v) < 1e-4)) return v.toExponential(3);
+    return String(Math.round(v * 1e6) / 1e6);
+  }
+  function gcd(a, b) { while (b) { var t = a % b; a = b; b = t; } return Math.abs(a); }
+
+  /* Returns { value, index, label } for the nearest member, or null when the
+     set has no member anywhere near v. `index` drives the even/odd split. */
+  function nearest(v, setIdx, n) {
+    if (!isFinite(v)) return null;
+    switch (SETS[setIdx] && SETS[setIdx].id) {
+      case 'whole': {
+        var iv = Math.round(v);
+        return { value: iv, index: iv, label: String(iv) };
+      }
+      case 'multiples': {
+        var k = Math.abs(n) < 1e-9 ? 1 : Math.abs(n);
+        var m = Math.round(v / k);
+        return { value: m * k, index: m, label: trim(m * k) };
+      }
+      case 'powers': {
+        var base = Math.max(1.0001, Math.abs(n));
+        if (v <= 0) return null;
+        var e = Math.round(Math.log(v) / Math.log(base));
+        var t = Math.pow(base, e);
+        return { value: t, index: e, label: trim(base) + sup(e) + ' = ' + trim(t) };
+      }
+      case 'fractions': {
+        var qmax = Math.max(1, Math.min(24, Math.round(n)));
+        var best = Infinity, bp = 0, bq = 1;
+        for (var q = 1; q <= qmax; q++) {
+          var p = Math.round(v * q), d = Math.abs(v - p / q);
+          if (d < best - 1e-15) { best = d; bp = p; bq = q; }
+        }
+        var g = gcd(bp, bq) || 1;
+        var rp = bp / g, rq = bq / g;
+        return {
+          value: bp / bq, index: rp,
+          label: rq === 1 ? String(rp) : rp + '/' + rq
+        };
+      }
+      default: {                  // integer-valued property sets
+        var i = Math.round(v);
+        var id = SETS[setIdx].id;
+        if (id === 'primes') return isPrime(i) ? { value: i, index: i, label: String(i) } : null;
+        if (id === 'squares') {
+          if (i < 0) return null;
+          var r = Math.round(Math.sqrt(i));
+          return r * r === i ? { value: i, index: r, label: r + '\u00b2 = ' + i } : null;
+        }
+        if (id === 'triangular') {
+          if (i < 0) return null;
+          var kk = Math.round((Math.sqrt(8 * i + 1) - 1) / 2);
+          return kk * (kk + 1) / 2 === i ? { value: i, index: kk, label: 'T' + sup(kk) + ' = ' + i } : null;
+        }
+        if (id === 'fibonacci') {
+          var fi = fibIndex(i);
+          return fi >= 0 ? { value: i, index: fi, label: 'F' + sup(fi) + ' = ' + i } : null;
+        }
+        if (id === 'factorials') {
+          var xi = factIndex(i);
+          return xi >= 0 ? { value: i, index: xi, label: xi + '! = ' + i } : null;
+        }
+        return null;
+      }
+    }
+  }
+
+  var GLSL_SETS = [
+    'bool setIsPrime(float x){',
+    '  if (x < 2.0 || x > 33000.0) return false;',
+    '  if (x < 4.0) return true;',
+    '  if (mod(x, 2.0) < 0.5) return false;',
+    '  for (int i = 3; i < 182; i += 2){',
+    '    float f = float(i);',
+    '    if (f * f > x) return true;',
+    '    if (mod(x, f) < 0.5) return false;',
+    '  }',
+    '  return true;',
+    '}',
+    'float setFibIndex(float x){',
+    '  if (x < 0.0 || x > 1e7) return -1.0;',
+    '  float a = 0.0, b = 1.0;',
+    '  for (int i = 0; i < 40; i++){',
+    '    if (abs(a - x) < 0.5) return float(i);',
+    '    if (a > x) return -1.0;',
+    '    float t = a + b; a = b; b = t;',
+    '  }',
+    '  return -1.0;',
+    '}',
+    'float setFactIndex(float x){',
+    '  if (x < 1.0) return -1.0;',
+    '  float f = 1.0;',
+    '  for (int i = 0; i <= 10; i++){',
+    '    if (i > 1) f *= float(i);',
+    '    if (abs(f - x) < 0.5) return float(i);',
+    '    if (f > x) return -1.0;',
+    '  }',
+    '  return -1.0;',
+    '}',
+    /* x = nearest member, y = parity index, z = 1 when a member exists */
+    'vec3 setNearest(float v){',
+    '  if (uSet == 0){ float iv = round(v); return vec3(iv, iv, 1.0); }',
+    '  if (uSet == 1){',
+    '    float k = (abs(uSetN) < 1e-9) ? 1.0 : abs(uSetN);',
+    '    float m = round(v / k);',
+    '    return vec3(m * k, m, 1.0);',
+    '  }',
+    '  if (uSet == 2){',
+    '    if (v <= 0.0) return vec3(0.0, 0.0, 0.0);',
+    '    float base = max(1.0001, abs(uSetN));',
+    '    float e = round(log(v) / log(base));',
+    '    return vec3(pow(base, e), e, 1.0);',
+    '  }',
+    '  if (uSet == 8){',
+    '    int qmax = int(clamp(floor(uSetN + 0.5), 1.0, 24.0));',
+    '    float best = 1e30, bt = 0.0, bp = 0.0;',
+    '    for (int q = 1; q <= 24; q++){',
+    '      if (q > qmax) break;',
+    '      float fq = float(q);',
+    '      float p = round(v * fq);',
+    '      float t = p / fq;',
+    '      float d = abs(v - t);',
+    '      if (d < best){ best = d; bt = t; bp = p; }',
+    '    }',
+    '    return vec3(bt, bp, 1.0);',
+    '  }',
+    '  float iv = round(v);',
+    '  if (uSet == 3) return setIsPrime(iv) ? vec3(iv, iv, 1.0) : vec3(0.0);',
+    '  if (uSet == 4){',
+    '    if (iv < 0.0) return vec3(0.0);',
+    '    float r = round(sqrt(iv));',
+    '    return (abs(r * r - iv) < 0.5) ? vec3(iv, r, 1.0) : vec3(0.0);',
+    '  }',
+    '  if (uSet == 5){',
+    '    if (iv < 0.0) return vec3(0.0);',
+    '    float k = round((sqrt(8.0 * iv + 1.0) - 1.0) * 0.5);',
+    '    return (abs(k * (k + 1.0) * 0.5 - iv) < 0.5) ? vec3(iv, k, 1.0) : vec3(0.0);',
+    '  }',
+    '  if (uSet == 6){',
+    '    float fi = setFibIndex(iv);',
+    '    return (fi >= 0.0) ? vec3(iv, fi, 1.0) : vec3(0.0);',
+    '  }',
+    '  if (uSet == 7){',
+    '    float xi = setFactIndex(iv);',
+    '    return (xi >= 0.0) ? vec3(iv, xi, 1.0) : vec3(0.0);',
+    '  }',
+    '  return vec3(0.0);',
+    '}'
+  ].join('\n');
+
+  var API = { SETS: SETS, nearest: nearest, isPrime: isPrime, GLSL_SETS: GLSL_SETS };
+  if (typeof module === 'object' && module.exports) module.exports = API;
+  root.OCGSETS = API;
+})(typeof globalThis !== 'undefined' ? globalThis : this);
+</script>
+<script>/* =========================================================================
+   Operation Color Graph — expression rendering
+   The same AST the renderer compiles is also drawn as maths, so what you see
+   is exactly how the expression was parsed. MathML renders natively in every
+   current browser, which keeps the page dependency-free.
+   ========================================================================= */
+(function (root) {
+  'use strict';
+
+  /* Binding power of each node, used to decide where brackets are needed. */
+  function bp(n) {
+    if (n.k === 'bin') {
+      if (n.op === '+' || n.op === '-') return 1;
+      if (n.op === '*' || n.op === '/' || n.op === '%') return 3;
+      return 7;                                    // ^
+    }
+    if (n.k === 'neg') return 2;
+    return 99;                                     // atoms and calls
+  }
+
+  var GREEK = { pi: '\u03c0', tau: '\u03c4', phi: '\u03c6' };
+  var NAMED = {
+    sin: 1, cos: 1, tan: 1, sec: 1, csc: 1, cot: 1, log: 1, exp: 1, min: 1, max: 1,
+    sinh: 1, cosh: 1, tanh: 1, sech: 1, csch: 1, coth: 1, erf: 1, gcd: 1, lcm: 1
+  };
+  var LATEX_FN = {
+    asin: '\\arcsin', acos: '\\arccos', atan: '\\arctan',
+    log2: '\\log_2', log10: '\\log_{10}', gamma: '\\Gamma', lgamma: '\\ln\\Gamma',
+    lambertw: 'W', sinc: '\\operatorname{sinc}', beta: '\\mathrm{B}'
+  };
+
+  function esc(s) {
+    return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+  function numText(v) {
+    if (Math.abs(v - Math.PI) < 1e-12) return GREEK.pi;
+    if (Math.abs(v - Math.PI * 2) < 1e-12) return GREEK.tau;
+    if (Math.abs(v - Math.E) < 1e-12) return 'e';
+    if (Math.abs(v - 1.618033988749895) < 1e-12) return GREEK.phi;
+    if (Number.isInteger(v)) return String(v);
+    return String(Math.round(v * 1e9) / 1e9);
+  }
+
+  /* ------------------------------------------------------------- MathML */
+  function mathml(ast) {
+    function paren(inner) {
+      return '<mo stretchy="true">(</mo>' + inner + '<mo stretchy="true">)</mo>';
+    }
+    function wrap(node, minBp) {
+      var s = go(node);
+      return bp(node) < minBp ? paren(s) : s;
+    }
+    function args(list, sep) {
+      return list.map(function (a) { return go(a); })
+        .join('<mo separator="true">' + (sep || ',') + '</mo>');
+    }
+    function call(name, list) {
+      var tag = NAMED[name] ? '<mi mathvariant="normal">' + esc(name) + '</mi>'
+        : '<mi>' + esc(name) + '</mi>';
+      return '<mrow>' + tag + '<mo>&#x2061;</mo>' +
+        '<mo stretchy="true">(</mo>' + args(list) + '<mo stretchy="true">)</mo></mrow>';
+    }
+    function go(n) {
+      switch (n.k) {
+        case 'num': return '<mn>' + esc(numText(n.v)) + '</mn>';
+        case 'var': return '<mi>' + esc(n.name) + '</mi>';
+        case 'neg': return '<mrow><mo>&#x2212;</mo>' + wrap(n.a, 2) + '</mrow>';
+        case 'bin': {
+          if (n.op === '/') {
+            return '<mfrac><mrow>' + go(n.l) + '</mrow><mrow>' + go(n.r) + '</mrow></mfrac>';
+          }
+          if (n.op === '^') {
+            /* the exponent sits in its own box, so it needs no brackets */
+            return '<msup><mrow>' + wrap(n.l, 8) + '</mrow><mrow>' + go(n.r) + '</mrow></msup>';
+          }
+          var op = n.op === '*' ? '<mo>&#x00b7;</mo>'
+            : n.op === '-' ? '<mo>&#x2212;</mo>'
+              : n.op === '%' ? '<mo lspace="0.22em" rspace="0.22em">mod</mo>'
+                : '<mo>+</mo>';
+          var lb = bp(n), rb = lb + 1;             // left-associative
+          return '<mrow>' + wrap(n.l, lb) + op + wrap(n.r, rb) + '</mrow>';
+        }
+        case 'call': {
+          if (n.name === 'sqrt') return '<msqrt><mrow>' + go(n.args[0]) + '</mrow></msqrt>';
+          if (n.name === 'cbrt') return '<mroot><mrow>' + go(n.args[0]) + '</mrow><mn>3</mn></mroot>';
+          if (n.name === 'root') return '<mroot><mrow>' + go(n.args[0]) + '</mrow><mrow>' + go(n.args[1]) + '</mrow></mroot>';
+          if (n.name === 'abs') return '<mrow><mo stretchy="true">|</mo>' + go(n.args[0]) + '<mo stretchy="true">|</mo></mrow>';
+          if (n.name === 'floor') return '<mrow><mo>&#x230a;</mo>' + go(n.args[0]) + '<mo>&#x230b;</mo></mrow>';
+          if (n.name === 'ceil') return '<mrow><mo>&#x2308;</mo>' + go(n.args[0]) + '<mo>&#x2309;</mo></mrow>';
+          if (n.name === 'factorial') return '<mrow>' + wrap(n.args[0], 8) + '<mo>!</mo></mrow>';
+          if (n.name === 'pow') return '<msup><mrow>' + wrap(n.args[0], 8) + '</mrow><mrow>' + go(n.args[1]) + '</mrow></msup>';
+          if (n.name === 'exp') return '<msup><mi>e</mi><mrow>' + go(n.args[0]) + '</mrow></msup>';
+          if (n.name === 'log') return call('ln', n.args);
+          if (n.name === 'log2') return '<mrow><msub><mi mathvariant="normal">log</mi><mn>2</mn></msub><mo>&#x2061;</mo><mo>(</mo>' + go(n.args[0]) + '<mo>)</mo></mrow>';
+          if (n.name === 'log10') return '<mrow><msub><mi mathvariant="normal">log</mi><mn>10</mn></msub><mo>&#x2061;</mo><mo>(</mo>' + go(n.args[0]) + '<mo>)</mo></mrow>';
+          if (n.name === 'logb') return '<mrow><msub><mi mathvariant="normal">log</mi><mrow>' + go(n.args[0]) + '</mrow></msub><mo>&#x2061;</mo><mo>(</mo>' + go(n.args[1]) + '<mo>)</mo></mrow>';
+          if (n.name === 'gamma') return '<mrow><mi mathvariant="normal">&#x0393;</mi><mo>&#x2061;</mo><mo>(</mo>' + go(n.args[0]) + '<mo>)</mo></mrow>';
+          if (n.name === 'hypot') return '<msqrt><mrow>' + go(n.args[0]) + '<mo>&#x00b2;</mo><mo>+</mo>' + go(n.args[1]) + '<mo>&#x00b2;</mo></mrow></msqrt>';
+          if (n.name === 'ncr') return '<mrow><mo>(</mo><mfrac linethickness="0"><mrow>' + go(n.args[0]) + '</mrow><mrow>' + go(n.args[1]) + '</mrow></mfrac><mo>)</mo></mrow>';
+          if (n.name === 'atan2') return call('atan2', n.args);
+          return call(n.name, n.args);
+        }
+      }
+      return '<mi>?</mi>';
+    }
+    return '<math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><mrow>' +
+      go(ast) + '</mrow></math>';
+  }
+
+  /* -------------------------------------------------------------- LaTeX */
+  function latex(ast) {
+    function wrap(node, minBp) {
+      var s = go(node);
+      return bp(node) < minBp ? '\\left(' + s + '\\right)' : s;
+    }
+    function go(n) {
+      switch (n.k) {
+        case 'num': {
+          var txt = numText(n.v);
+          if (txt === '\u03c0') return '\\pi';
+          if (txt === '\u03c4') return '\\tau';
+          if (txt === '\u03c6') return '\\varphi';
+          return txt;
+        }
+        case 'var': return n.name;
+        case 'neg': return '-' + wrap(n.a, 2);
+        case 'bin': {
+          if (n.op === '/') return '\\frac{' + go(n.l) + '}{' + go(n.r) + '}';
+          if (n.op === '^') return wrap(n.l, 8) + '^{' + go(n.r) + '}';
+          if (n.op === '*') return wrap(n.l, 3) + ' \\cdot ' + wrap(n.r, 4);
+          if (n.op === '%') return wrap(n.l, 3) + ' \\bmod ' + wrap(n.r, 4);
+          return wrap(n.l, 1) + ' ' + n.op + ' ' + wrap(n.r, 2);
+        }
+        case 'call': {
+          var A = n.args.map(go);
+          if (n.name === 'sqrt') return '\\sqrt{' + A[0] + '}';
+          if (n.name === 'cbrt') return '\\sqrt[3]{' + A[0] + '}';
+          if (n.name === 'root') return '\\sqrt[' + A[1] + ']{' + A[0] + '}';
+          if (n.name === 'abs') return '\\left|' + A[0] + '\\right|';
+          if (n.name === 'floor') return '\\left\\lfloor ' + A[0] + '\\right\\rfloor';
+          if (n.name === 'ceil') return '\\left\\lceil ' + A[0] + '\\right\\rceil';
+          if (n.name === 'factorial') return wrap(n.args[0], 8) + '!';
+          if (n.name === 'pow') return wrap(n.args[0], 8) + '^{' + A[1] + '}';
+          if (n.name === 'exp') return 'e^{' + A[0] + '}';
+          if (n.name === 'log') return '\\ln\\left(' + A[0] + '\\right)';
+          if (n.name === 'logb') return '\\log_{' + A[0] + '}\\left(' + A[1] + '\\right)';
+          if (n.name === 'hypot') return '\\sqrt{' + A[0] + '^{2}+' + A[1] + '^{2}}';
+          if (n.name === 'ncr') return '\\binom{' + A[0] + '}{' + A[1] + '}';
+          if (LATEX_FN[n.name]) return LATEX_FN[n.name] + '\\left(' + A.join(',') + '\\right)';
+          if (NAMED[n.name]) return '\\' + n.name + '\\left(' + A.join(',') + '\\right)';
+          return '\\operatorname{' + n.name + '}\\left(' + A.join(',') + '\\right)';
+        }
+      }
+      return '?';
+    }
+    return go(ast);
+  }
+
+  /* ----------------------------------------------------------- canonical */
+  /* Plain text with every compound operand bracketed, whether or not the
+     brackets are strictly required. Minimal bracketing would print
+     `x^2 - y` unchanged, which settles nothing; the point here is to show
+     the grouping the parser chose. */
+  function canonical(ast) {
+    function group(n) {
+      var s = go(n);
+      return (n.k === 'bin' || n.k === 'neg') ? '(' + s + ')' : s;
+    }
+    function go(n) {
+      switch (n.k) {
+        case 'num': return numText(n.v);
+        case 'var': return n.name;
+        case 'neg': return '-' + group(n.a);
+        case 'bin':
+          if (n.op === '^') return group(n.l) + '^' + group(n.r);
+          return group(n.l) + ' ' + n.op + ' ' + group(n.r);
+        case 'call':
+          if (n.name === 'factorial') return group(n.args[0]) + '!';
+          return n.name + '(' + n.args.map(go).join(', ') + ')';
+      }
+      return '?';
+    }
+    return go(ast);          // the whole expression needs no outer brackets
+  }
+
+  var API = { mathml: mathml, latex: latex, canonical: canonical };
+  if (typeof module === 'object' && module.exports) module.exports = API;
+  root.OCGFMT = API;
+})(typeof globalThis !== 'undefined' ? globalThis : this);
+</script>
+<script>/* =========================================================================
+   Operation Color Graph — GLSL ES 3.00 shader assembly
+   ========================================================================= */
+(function (root) {
+  'use strict';
+  var C = root.OCG || (typeof require === 'function' ? require('./core.js') : null);
+  var SETS = root.OCGSETS || (typeof require === 'function' ? require('./sets.js') : null);
+
+  /* Fullscreen triangle, no attribute buffers. */
+  var VS = [
+    '#version 300 es',
+    'void main(){',
+    '  vec2 p = vec2(float((gl_VertexID << 1) & 2), float(gl_VertexID & 2));',
+    '  gl_Position = vec4(p * 2.0 - 1.0, 0.0, 1.0);',
+    '}'
+  ].join('\n');
+
+  var FIELD_UNIFORMS = [
+    'uniform vec2 uCenter;',
+    'uniform vec2 uSize;',
+    'uniform float uUPP;',
+    'uniform float uTime;',
+    'uniform int uCont;',
+    'uniform int uRepair;'
+  ].join('\n');
+
+  var SHADE_UNIFORMS = [
+    'uniform int uPalette;',
+    'uniform int uBands;',
+    'uniform int uLines;',
+    'uniform int uParity;',
+    'uniform int uSet;',
+    'uniform int uParityOK;',
+    'uniform int uHiOn;',
+    'uniform float uSetN;',
+    'uniform float uHiVal;',
+    'uniform int uAA;',
+    'uniform int uContTint;',
+    'uniform float uPhase;',
+    'uniform float uFreq;',
+    'uniform float uLineW;',
+    'uniform float uLineAmt;',
+    'uniform vec3 uColA;',
+    'uniform vec3 uColB;',
+    'uniform vec3 uVoid;',
+    'uniform vec3 uMean;'
+  ].join('\n');
+
+  var COLOUR_FN = [
+    'vec3 rgb2hsl(vec3 c){',
+    '  float mx = max(c.r, max(c.g, c.b));',
+    '  float mn = min(c.r, min(c.g, c.b));',
+    '  float l = (mx + mn) * 0.5;',
+    '  float d = mx - mn;',
+    '  if (d < 1e-6) return vec3(0.0, 0.0, l);',
+    '  float sat = d / (1.0 - abs(2.0 * l - 1.0));',
+    '  float h;',
+    '  if (mx == c.r) h = mod((c.g - c.b) / d, 6.0);',
+    '  else if (mx == c.g) h = (c.b - c.r) / d + 2.0;',
+    '  else h = (c.r - c.g) / d + 4.0;',
+    '  return vec3(h / 6.0, clamp(sat, 0.0, 1.0), l);',
+    '}',
+    /* last resort: the straight negative, forced apart if it lands too close */
+    'vec3 negativeOf(vec3 base){',
+    '  vec3 n = vec3(1.0) - base;',
+    '  if (distance(n, base) < 0.5)',
+    '    n = (dot(base, vec3(0.299, 0.587, 0.114)) > 0.5) ? vec3(0.0) : vec3(1.0);',
+    '  return n;',
+    '}',
+    /* Complement = opposite hue. Split complement = +/- 150 degrees, used to
+       tell even members from odd. Saturation and lightness are pushed apart
+       so the line stays legible over washed-out or near-grey ground. */
+    'vec3 lineColour(vec3 base, float pidx){',
+    '  if (uParity == 1 && uParityOK == 0) return negativeOf(base);',
+    '  float rot = 0.5;',
+    '  if (uParity == 1)',
+    '    rot = (mod(abs(pidx), 2.0) < 0.5) ? 0.4166667 : -0.4166667;',
+    '  vec3 hsl = rgb2hsl(base);',
+    '  float h = fract(hsl.x + rot + 1.0);',
+    '  float sat = max(hsl.y, 0.85);',
+    '  float l = 1.0 - hsl.z;',
+    '  if (abs(l - hsl.z) < 0.3) l = (hsl.z > 0.5) ? hsl.z - 0.38 : hsl.z + 0.38;',
+    '  vec3 outc = hsl2rgb(h, sat, clamp(l, 0.04, 0.96));',
+    '  if (distance(outc, base) < 0.32) return negativeOf(base);',
+    '  return outc;',
+    '}'
+  ].join('\n');
+
+  var SHADE_FN = [
+    'vec3 shade(vec4 f, float ssf){',
+    '  float v = f.x, w = f.y, cont = f.z;',
+    '  if (!(abs(v) < BIG)) return uVoid;',
+    '  float u = fract(v * uFreq + uPhase);',
+    '  vec3 col = palette(u);',
+    '  float aa = 0.0;',
+    '  if (uAA == 1){',
+    '    aa = clamp((w * uFreq - 0.25) / 0.65, 0.0, 1.0);',
+    '    aa = aa * aa * (3.0 - 2.0 * aa);',
+    '    col = mix(col, uMean, aa);',
+    '  }',
+    '  if (uLines == 1){',
+    '    vec3 hit = setNearest(v);',
+    '    if (hit.z > 0.5){',
+    '      float target = hit.x;',
+    '      float d = abs(v - target) / max(w, 1e-20);',
+    '      float hw = uLineW * 0.5 * ssf;',
+    /* the contour under the pointer thickens so it can be read off */
+    '      float tol = max(1e-6, abs(uHiVal) * 1e-5);',
+    '      bool hot = (uHiOn == 1) && (abs(target - uHiVal) <= tol);',
+    '      if (hot) hw *= 2.4;',
+    '      float m = (1.0 - smoothstep(hw - 0.5, hw + 0.5, d)) * (1.0 - aa);',
+    '      if (m > 0.002) col = mix(col, lineColour(col, hit.y), m * uLineAmt);',
+    '    }',
+    '  }',
+    '  if (uContTint == 1 && cont > 0.5){',
+    '    float hatch = step(0.5, fract((gl_FragCoord.x + gl_FragCoord.y) * 0.1666667));',
+    '    col = mix(col, col * 0.45, hatch * 0.55);',
+    '  }',
+    '  return col;',
+    '}'
+  ].join('\n');
+
+  /* F(x, y) wraps the user expression, exposing r and a as locals. */
+  function fieldFn(exprSrc) {
+    return [
+      'float F(float x, float y){',
+      '  float r = sqrt(x * x + y * y);',
+      '  float a = (x == 0.0 && y == 0.0) ? 0.0 : atan(y, x);',
+      '  return ' + exprSrc + ';',
+      '}'
+    ].join('\n');
+  }
+
+  /* Removable-singularity repair: probe four neighbours; accept the fill only
+     when the finite ones agree to within one full colour cycle. */
+  var REPAIR = [
+    '  if (isBad && uRepair == 1){',
+    '    float h = uUPP;',
+    '    float s = 0.0, n = 0.0, lo = BIG, hi = -BIG;',
+    '    for (int i = 0; i < 4; i++){',
+    '      vec2 o = (i == 0) ? vec2(h, 0.0) : ((i == 1) ? vec2(-h, 0.0)',
+    '             : ((i == 2) ? vec2(0.0, h) : vec2(0.0, -h)));',
+    '      gCont = 0.0; gPole = 0.0;',
+    '      float q = F(p.x + o.x, p.y + o.y);',
+    '      if (abs(q) < BIG){ s += q; n += 1.0; lo = min(lo, q); hi = max(hi, q); }',
+    '    }',
+    '    if (n >= 2.0 && (hi - lo) < 1.0){ v = s / n; isBad = false; cont = 1.0; pole = 0.0; }',
+    '  }'
+  ].join('\n');
+
+  /* Pass 1 of 2: evaluate the field into an RGBA32F target. */
+  function buildFieldFS(exprSrc) {
+    return [
+      '#version 300 es',
+      'precision highp float;',
+      'precision highp int;',
+      FIELD_UNIFORMS,
+      'out vec4 outColor;',
+      C.GLSL_PRELUDE,
+      fieldFn(exprSrc),
+      'void main(){',
+      '  vec2 p = uCenter + (gl_FragCoord.xy - uSize * 0.5) * uUPP;',
+      '  gCont = 0.0; gPole = 0.0;',
+      '  float v = F(p.x, p.y);',
+      '  float cont = gCont, pole = gPole;',
+      '  bool isBad = !(abs(v) < BIG);',
+      REPAIR,
+      '  float w = fwidth(v);',
+      '  if (isBad){ v = VBAD; w = BIG; }',
+      '  outColor = vec4(v, w, cont, pole);',
+      '}'
+    ].join('\n');
+  }
+
+  /* Pass 2 of 2: colourise the cached field.  Cheap, so colour cycling and
+     palette changes never re-evaluate the expression. */
+  function buildColorFS() {
+    return [
+      '#version 300 es',
+      'precision highp float;',
+      'precision highp int;',
+      'uniform sampler2D uField;',
+      'uniform int uSS;',
+      SHADE_UNIFORMS,
+      'const float BIG = 1e30;',
+      'out vec4 outColor;',
+      C.GLSL_PALETTE,
+      SETS.GLSL_SETS,
+      COLOUR_FN,
+      SHADE_FN,
+      'void main(){',
+      '  ivec2 base = ivec2(gl_FragCoord.xy) * uSS;',
+      '  vec3 acc = vec3(0.0);',
+      '  float ssf = float(uSS);',
+      '  for (int j = 0; j < 4; j++){',
+      '    if (j >= uSS) break;',
+      '    for (int i = 0; i < 4; i++){',
+      '      if (i >= uSS) break;',
+      '      acc += shade(texelFetch(uField, base + ivec2(i, j), 0), ssf);',
+      '    }',
+      '  }',
+      '  outColor = vec4(acc / (ssf * ssf), 1.0);',
+      '}'
+    ].join('\n');
+  }
+
+  /* Fallback for contexts without renderable float textures: one pass, no
+     field cache.  Derivatives come from explicit finite differences. */
+  function buildSinglePassFS(exprSrc) {
+    return [
+      '#version 300 es',
+      'precision highp float;',
+      'precision highp int;',
+      FIELD_UNIFORMS,
+      'uniform int uSS;',
+      SHADE_UNIFORMS,
+      'out vec4 outColor;',
+      C.GLSL_PRELUDE,
+      fieldFn(exprSrc),
+      C.GLSL_PALETTE,
+      SETS.GLSL_SETS,
+      COLOUR_FN,
+      SHADE_FN,
+      'vec4 evalAt(vec2 p, float h){',
+      '  gCont = 0.0; gPole = 0.0;',
+      '  float v = F(p.x, p.y);',
+      '  float cont = gCont, pole = gPole;',
+      '  bool isBad = !(abs(v) < BIG);',
+      REPAIR,
+      '  if (isBad) return vec4(VBAD, BIG, cont, pole);',
+      '  gCont = 0.0; gPole = 0.0; float vx = F(p.x + h, p.y);',
+      '  gCont = 0.0; gPole = 0.0; float vy = F(p.x, p.y + h);',
+      '  float w = 0.0;',
+      '  w += (abs(vx) < BIG) ? abs(vx - v) : BIG;',
+      '  w += (abs(vy) < BIG) ? abs(vy - v) : BIG;',
+      '  return vec4(v, w, cont, pole);',
+      '}',
+      'void main(){',
+      '  float ssf = float(uSS);',
+      '  float sub = uUPP / ssf;',
+      '  vec2 p0 = uCenter + (gl_FragCoord.xy - uSize * 0.5) * uUPP;',
+      '  vec3 acc = vec3(0.0);',
+      '  for (int j = 0; j < 4; j++){',
+      '    if (j >= uSS) break;',
+      '    for (int i = 0; i < 4; i++){',
+      '      if (i >= uSS) break;',
+      '      vec2 p = p0 + (vec2(float(i), float(j)) + 0.5) * sub - uUPP * 0.5;',
+      '      acc += shade(evalAt(p, sub), ssf);',
+      '    }',
+      '  }',
+      '  outColor = vec4(acc / (ssf * ssf), 1.0);',
+      '}'
+    ].join('\n');
+  }
+
+  var API = {
+    VS: VS,
+    buildFieldFS: buildFieldFS,
+    buildColorFS: buildColorFS,
+    buildSinglePassFS: buildSinglePassFS
+  };
+  if (typeof module === 'object' && module.exports) module.exports = API;
+  root.OCGSH = API;
+})(typeof globalThis !== 'undefined' ? globalThis : this);
+</script>
+<script>/* =========================================================================
+   Operation Color Graph — application layer
+   ========================================================================= */
+(function () {
+  'use strict';
+  var C = window.OCG, SH = window.OCGSH;
+  var SETS = window.OCGSETS, FMT = window.OCGFMT;
+  var $ = function (id) { return document.getElementById(id); };
+  var clamp = function (v, a, b) { return v < a ? a : (v > b ? b : v); };
+
+  /* ------------------------------------------------------------- state */
+  var S = {
+    expr: 'x / y',
+    ast: null, fn: null, glsl: '', info: null, error: null,
+    cx: 0, cy: 0, ppu: 84,          // CSS pixels per unit
+    viewTouched: false,
+    palette: 0, colA: '#12224f', colB: '#f3c969', bands: 6,
+    freq: 1, phase: 0,
+    cycling: false, cycleSpeed: 0.12,
+    animTime: false, timeSpeed: 1, time: 0,
+    lines: false, lineW: 1.6, parity: false, set: 0, setN: 2,
+    hiOn: false, hiVal: 0,
+    aa: true, repair: true, cont: 1, markCont: true,
+    ss: 1, grid: true,
+    backendPref: 'auto',
+    voidRGB: [0.055, 0.065, 0.086]
+  };
+
+  var host = $('stage'), overlay = $('overlay'), rail = $('rail');
+  var canvas = null, R = null, backend = 'none';
+  var gpuBlockedUntil = 0, gpuSupported = true;
+  var dpr = 1, Wc = 0, Hc = 0;                   // CSS size of the stage
+  var fieldDirty = true, presentDirty = true, overlayDirty = true, rafId = 0;
+  var lastRenderMs = 0, interacting = false, idleTimer = 0;
+
+  /* ==================================================================== */
+  /*  GPU renderer                                                        */
+  /* ==================================================================== */
+  function createGPU(cv) {
+    var gl = cv.getContext('webgl2', {
+      antialias: false, depth: false, stencil: false, alpha: false,
+      preserveDrawingBuffer: false, powerPreference: 'high-performance'
+    });
+    if (!gl) return null;
+
+    var floatRT = !!gl.getExtension('EXT_color_buffer_float');
+    var vao = gl.createVertexArray();
+    var fieldProg = null, colorProg = null, singleProg = null;
+    var tex = null, fbo = null, texW = 0, texH = 0;
+    var statusNote = floatRT ? '' : 'no float targets \u2014 single pass';
+
+    function compile(type, src) {
+      var s = gl.createShader(type);
+      gl.shaderSource(s, src); gl.compileShader(s);
+      if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) {
+        var log = gl.getShaderInfoLog(s);
+        gl.deleteShader(s);
+        throw new Error(log || 'shader compile failed');
+      }
+      return s;
+    }
+    function link(vsSrc, fsSrc) {
+      var p = gl.createProgram();
+      var vs = compile(gl.VERTEX_SHADER, vsSrc), fs = compile(gl.FRAGMENT_SHADER, fsSrc);
+      gl.attachShader(p, vs); gl.attachShader(p, fs); gl.linkProgram(p);
+      gl.deleteShader(vs); gl.deleteShader(fs);
+      if (!gl.getProgramParameter(p, gl.LINK_STATUS)) {
+        var log = gl.getProgramInfoLog(p);
+        gl.deleteProgram(p);
+        throw new Error(log || 'program link failed');
+      }
+      var u = {};
+      var n = gl.getProgramParameter(p, gl.ACTIVE_UNIFORMS);
+      for (var i = 0; i < n; i++) {
+        var info = gl.getActiveUniform(p, i);
+        u[info.name] = gl.getUniformLocation(p, info.name);
+      }
+      return { p: p, u: u };
+    }
+
+    if (floatRT) colorProg = link(SH.VS, SH.buildColorFS());
+
+    var lastSrc = null, lost = false, closing = false;
+    cv.addEventListener('webglcontextlost', function (e) {
+      e.preventDefault();
+      lost = true;
+      if (closing) return;          // we asked for this; not a failure
+      /* A real loss (driver reset, tab evicted). Fall back, but only for a
+         cooldown so the GPU is retried instead of being abandoned. */
+      gpuBlockedUntil = Date.now() + 20000;
+      note('Lost the graphics context. Using the CPU, and retrying shortly.');
+      ensureBackend();
+      fieldDirty = presentDirty = true;
+      schedule();
+    });
+
+    function setExpr(glslSrc) {
+      lastSrc = glslSrc;
+      var np;
+      if (floatRT) {
+        np = link(SH.VS, SH.buildFieldFS(glslSrc));
+        if (fieldProg) gl.deleteProgram(fieldProg.p);
+        fieldProg = np;
+      } else {
+        np = link(SH.VS, SH.buildSinglePassFS(glslSrc));
+        if (singleProg) gl.deleteProgram(singleProg.p);
+        singleProg = np;
+      }
+    }
+
+    /* ensureTarget can demote us to single-pass after the fact. */
+    function ensurePrograms() {
+      if (!lastSrc) return false;
+      if (floatRT && !fieldProg) fieldProg = link(SH.VS, SH.buildFieldFS(lastSrc));
+      if (!floatRT && !singleProg) singleProg = link(SH.VS, SH.buildSinglePassFS(lastSrc));
+      return true;
+    }
+
+    function ensureTarget(w, h) {
+      if (!floatRT) return;
+      if (tex && texW === w && texH === h) return;
+      if (tex) { gl.deleteTexture(tex); gl.deleteFramebuffer(fbo); }
+      texW = w; texH = h;
+      tex = gl.createTexture();
+      gl.bindTexture(gl.TEXTURE_2D, tex);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA32F, w, h, 0, gl.RGBA, gl.FLOAT, null);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+      fbo = gl.createFramebuffer();
+      gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
+      gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex, 0);
+      var ok = gl.checkFramebufferStatus(gl.FRAMEBUFFER) === gl.FRAMEBUFFER_COMPLETE;
+      gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+      if (!ok) { floatRT = false; statusNote = 'float target refused \u2014 single pass'; }
+    }
+
+    /* A uniform the compiler proved unused has no location, so every set
+       is guarded rather than assumed. */
+    function u1i(l, v) { if (l) gl.uniform1i(l, v); }
+    function u1f(l, v) { if (l) gl.uniform1f(l, v); }
+    function u2f(l, a, b) { if (l) gl.uniform2f(l, a, b); }
+    function u3f(l, a, b, c) { if (l) gl.uniform3f(l, a, b, c); }
+
+    /* Supersampling is capped by the driver's texture limit. */
+    function effSS() {
+      var m = gl.getParameter(gl.MAX_TEXTURE_SIZE);
+      var s = S.ss;
+      while (s > 1 && (cv.width * s > m || cv.height * s > m)) s--;
+      return s;
+    }
+
+    function fieldUniforms(u, ss) {
+      u2f(u.uCenter, S.cx, S.cy);
+      u2f(u.uSize, cv.width * ss, cv.height * ss);
+      u1f(u.uUPP, 1 / (S.ppu * dpr * ss));
+      u1f(u.uTime, S.time);
+      u1i(u.uCont, S.cont);
+      u1i(u.uRepair, S.repair ? 1 : 0);
+    }
+    function shadeUniforms(u, ss) {
+      var A = hexRGB(S.colA), B = hexRGB(S.colB);
+      var mean = C.paletteMean(S.palette, A, B, S.bands);
+      u1i(u.uPalette, S.palette);
+      u1i(u.uBands, S.bands);
+      u1i(u.uLines, S.lines ? 1 : 0);
+      u1i(u.uParity, S.parity ? 1 : 0);
+      u1i(u.uSet, S.set);
+      u1i(u.uParityOK, SETS.SETS[S.set].parity ? 1 : 0);
+      u1i(u.uHiOn, S.lines && S.hiOn ? 1 : 0);
+      u1f(u.uSetN, S.setN);
+      u1f(u.uHiVal, S.hiVal);
+      u1i(u.uAA, S.aa ? 1 : 0);
+      u1i(u.uContTint, S.cont !== 0 && S.markCont ? 1 : 0);
+      u1f(u.uPhase, S.phase);
+      u1f(u.uFreq, S.freq);
+      u1f(u.uLineW, S.lineW);
+      u1f(u.uLineAmt, 1);
+      u3f(u.uColA, A[0], A[1], A[2]);
+      u3f(u.uColB, B[0], B[1], B[2]);
+      u3f(u.uVoid, S.voidRGB[0], S.voidRGB[1], S.voidRGB[2]);
+      u3f(u.uMean, mean[0], mean[1], mean[2]);
+      u1i(u.uSS, ss);
+    }
+
+    var curSS = 1;
+
+    return {
+      kind: 'gpu',
+      getNote: function () { return statusNote; },
+      setExpr: setExpr,
+      resize: function () {
+        if (!cv.width || !cv.height) return;
+        curSS = effSS();
+        if (floatRT) ensureTarget(cv.width * curSS, cv.height * curSS);
+      },
+      renderField: function () {
+        if (lost || !ensurePrograms()) return;
+        curSS = effSS();
+        if (!floatRT) return;
+        ensureTarget(cv.width * curSS, cv.height * curSS);
+        if (!floatRT) return;                       // demoted by ensureTarget
+        gl.bindVertexArray(vao);
+        gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
+        gl.viewport(0, 0, texW, texH);
+        gl.useProgram(fieldProg.p);
+        fieldUniforms(fieldProg.u, curSS);
+        gl.drawArrays(gl.TRIANGLES, 0, 3);
+        gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+      },
+      present: function () {
+        if (lost || !ensurePrograms()) return;
+        gl.bindVertexArray(vao);
+        gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+        gl.viewport(0, 0, cv.width, cv.height);
+        if (floatRT) {
+          gl.useProgram(colorProg.p);
+          gl.activeTexture(gl.TEXTURE0);
+          gl.bindTexture(gl.TEXTURE_2D, tex);
+          u1i(colorProg.u.uField, 0);
+          shadeUniforms(colorProg.u, curSS);
+        } else {
+          gl.useProgram(singleProg.p);
+          fieldUniforms(singleProg.u, 1);
+          shadeUniforms(singleProg.u, curSS);
+        }
+        gl.drawArrays(gl.TRIANGLES, 0, 3);
+      },
+      readPixels: function () {
+        var w = cv.width, h = cv.height;
+        var buf = new Uint8Array(w * h * 4);
+        gl.readPixels(0, 0, w, h, gl.RGBA, gl.UNSIGNED_BYTE, buf);
+        return { data: buf, w: w, h: h, flip: true };
+      },
+      destroy: function () {
+        closing = true;
+        var ext = gl.getExtension('WEBGL_lose_context');
+        if (ext) ext.loseContext();
+      }
+    };
+  }
+
+  /* ==================================================================== */
+  /*  CPU renderer                                                        */
+  /* ==================================================================== */
+  function createCPU(cv) {
+    var ctx = cv.getContext('2d');
+    var buf = null, flags = null, bw = 0, bh = 0;
+    var off = document.createElement('canvas');
+    var offCtx = off.getContext('2d');
+    var img = null;
+
+    function alloc(w, h) {
+      if (bw === w && bh === h) return;
+      bw = w; bh = h;
+      buf = new Float64Array(w * h);
+      flags = new Uint8Array(w * h);
+      off.width = w; off.height = h;
+      img = offCtx.createImageData(w, h);
+    }
+
+    function evalField(k) {
+      var w = Math.max(1, Math.round(cv.width * k));
+      var h = Math.max(1, Math.round(cv.height * k));
+      alloc(w, h);
+      var upp = 1 / (S.ppu * dpr * k);
+      var f = S.fn, RT = C.RT;
+      RT.mode = S.cont;
+      var repair = S.repair;
+      for (var j = 0; j < h; j++) {
+        var gy = (h - 1 - j) + 0.5 - h * 0.5;
+        var wy = S.cy + gy * upp;
+        var row = j * w;
+        for (var i = 0; i < w; i++) {
+          var wx = S.cx + (i + 0.5 - w * 0.5) * upp;
+          RT.cont = 0; RT.pole = 0;
+          var v = f(wx, wy, S.time, Math.sqrt(wx * wx + wy * wy),
+            (wx === 0 && wy === 0) ? 0 : Math.atan2(wy, wx));
+          var fl = (RT.cont ? 1 : 0) | (RT.pole ? 2 : 0);
+          if (C.bad(v) && repair) {
+            var s = 0, n = 0, lo = Infinity, hi = -Infinity;
+            for (var d = 0; d < 4; d++) {
+              var ox = d === 0 ? upp : (d === 1 ? -upp : 0);
+              var oy = d === 2 ? upp : (d === 3 ? -upp : 0);
+              var px = wx + ox, py = wy + oy;
+              RT.cont = 0; RT.pole = 0;
+              var q = f(px, py, S.time, Math.sqrt(px * px + py * py),
+                (px === 0 && py === 0) ? 0 : Math.atan2(py, px));
+              if (!C.bad(q)) { s += q; n++; if (q < lo) lo = q; if (q > hi) hi = q; }
+            }
+            if (n >= 2 && (hi - lo) < 1) { v = s / n; fl = 1; }
+          }
+          if (C.bad(v)) v = C.VBAD;
+          buf[row + i] = v;
+          flags[row + i] = fl;
+        }
+      }
+      return k;
+    }
+
+    /* Palette lookup table — avoids allocating an array per pixel. */
+    var LUT_N = 1024, lut = new Float32Array(LUT_N * 3);
+    function buildLUT(A, B) {
+      for (var i = 0; i < LUT_N; i++) {
+        var c = C.paletteRGB(S.palette, (i + 0.5) / LUT_N, A, B, S.bands);
+        lut[i * 3] = c[0]; lut[i * 3 + 1] = c[1]; lut[i * 3 + 2] = c[2];
+      }
+    }
+
+    /* Mirror of the GLSL shade() function. */
+    function colorize(k) {
+      var w = bw, h = bh, data = img.data;
+      var A = hexRGB(S.colA), B = hexRGB(S.colB);
+      var mean = C.paletteMean(S.palette, A, B, S.bands);
+      buildLUT(A, B);
+      var m0 = mean[0], m1 = mean[1], m2 = mean[2];
+      var vr0 = S.voidRGB[0] * 255, vr1 = S.voidRGB[1] * 255, vr2 = S.voidRGB[2] * 255;
+      var ssf = k, freq = S.freq, phase = S.phase, BG = C.BIG;
+      var lines = S.lines, hw = S.lineW * 0.5 * ssf, parity = S.parity;
+      var setKind = S.set, setN = S.setN, hiOn = S.lines && S.hiOn;
+      var parityOK = SETS.SETS[setKind].parity;
+      var doAA = S.aa;
+      var tint = S.cont !== 0 && S.markCont;
+      for (var j = 0; j < h; j++) {
+        var row = j * w;
+        for (var i = 0; i < w; i++) {
+          var idx = row + i, o = idx * 4;
+          var v = buf[idx];
+          if (!(Math.abs(v) < BG)) {
+            data[o] = vr0; data[o + 1] = vr1; data[o + 2] = vr2;
+            data[o + 3] = 255; continue;
+          }
+          /* |grad v| per buffer pixel, L1, via central differences */
+          var nx = (i + 1 < w ? 1 : 0) + (i > 0 ? 1 : 0);
+          var ny = (j + 1 < h ? 1 : 0) + (j > 0 ? 1 : 0);
+          var xa = buf[i + 1 < w ? idx + 1 : idx], xb = buf[i > 0 ? idx - 1 : idx];
+          var ya = buf[j + 1 < h ? idx + w : idx], yb = buf[j > 0 ? idx - w : idx];
+          var gw = 0;
+          gw += (!(Math.abs(xa) < BG) || !(Math.abs(xb) < BG)) ? BG : Math.abs(xa - xb) / (nx || 1);
+          gw += (!(Math.abs(ya) < BG) || !(Math.abs(yb) < BG)) ? BG : Math.abs(ya - yb) / (ny || 1);
+
+          var u = v * freq + phase; u -= Math.floor(u);
+          var li = (u * LUT_N) | 0; if (li >= LUT_N) li = LUT_N - 1;
+          li *= 3;
+          var cr = lut[li], cg = lut[li + 1], cb = lut[li + 2];
+          var aa = 0;
+          if (doAA) {
+            aa = clamp((gw * freq - 0.30) / 0.75, 0, 1);
+            aa = aa * aa * (3 - 2 * aa);
+            cr += (m0 - cr) * aa; cg += (m1 - cg) * aa; cb += (m2 - cb) * aa;
+          }
+          if (lines) {
+            var hit = SETS.nearest(v, setKind, setN);
+            if (hit) {
+              var dist = Math.abs(v - hit.value) / Math.max(gw, 1e-20);
+              var half = hw;
+              var tol = Math.max(1e-6, Math.abs(S.hiVal) * 1e-5);
+              if (hiOn && Math.abs(hit.value - S.hiVal) <= tol) half *= 2.4;
+              var m = (1 - smooth(half - 0.5, half + 0.5, dist)) * (1 - aa);
+              if (m > 0.001) {
+                var lc = lineColour(cr, cg, cb, hit.index, parity, parityOK);
+                cr += (lc[0] - cr) * m; cg += (lc[1] - cg) * m; cb += (lc[2] - cb) * m;
+              }
+            }
+          }
+          if (tint && (flags[idx] & 1)) {
+            var hatch = ((i + (h - 1 - j)) * 0.1666667) % 1 >= 0.5 ? 1 : 0;
+            if (hatch) { cr *= 0.752; cg *= 0.752; cb *= 0.752; }
+          }
+          data[o] = cr * 255; data[o + 1] = cg * 255; data[o + 2] = cb * 255; data[o + 3] = 255;
+        }
+      }
+      offCtx.putImageData(img, 0, 0);
+      ctx.imageSmoothingEnabled = k > 1;
+      ctx.clearRect(0, 0, cv.width, cv.height);
+      ctx.drawImage(off, 0, 0, w, h, 0, 0, cv.width, cv.height);
+    }
+
+    var lastK = 1;
+    return {
+      kind: 'cpu',
+      getNote: function () { return ''; },
+      setExpr: function () { },
+      resize: function () { },
+      renderField: function () { lastK = evalField(cpuScale()); },
+      present: function () { if (buf) colorize(lastK); },
+      readPixels: null,
+      destroy: function () { }
+    };
+  }
+
+  /* JS twins of rgb2hsl / negativeOf / lineColour in the shader. */
+  function rgb2hsl(r, g, b) {
+    var mx = Math.max(r, g, b), mn = Math.min(r, g, b);
+    var l = (mx + mn) * 0.5, d = mx - mn;
+    if (d < 1e-6) return [0, 0, l];
+    var sat = d / (1 - Math.abs(2 * l - 1));
+    var h;
+    if (mx === r) h = ((g - b) / d) % 6;
+    else if (mx === g) h = (b - r) / d + 2;
+    else h = (r - g) / d + 4;
+    return [h / 6, clamp(sat, 0, 1), l];
+  }
+  function negativeOf(r, g, b) {
+    var n = [1 - r, 1 - g, 1 - b];
+    var dd = Math.sqrt((n[0] - r) * (n[0] - r) + (n[1] - g) * (n[1] - g) + (n[2] - b) * (n[2] - b));
+    if (dd < 0.5) {
+      var lum = r * 0.299 + g * 0.587 + b * 0.114;
+      var k = lum > 0.5 ? 0 : 1;
+      return [k, k, k];
+    }
+    return n;
+  }
+  function lineColour(r, g, b, pidx, parity, parityOK) {
+    if (parity && !parityOK) return negativeOf(r, g, b);
+    var rot = 0.5;
+    if (parity) rot = (Math.abs(pidx) % 2 < 0.5) ? 0.4166667 : -0.4166667;
+    var hsl = rgb2hsl(r, g, b);
+    var h = (hsl[0] + rot + 1) % 1;
+    var sat = Math.max(hsl[1], 0.85);
+    var l = 1 - hsl[2];
+    if (Math.abs(l - hsl[2]) < 0.3) l = hsl[2] > 0.5 ? hsl[2] - 0.38 : hsl[2] + 0.38;
+    var out = C.hsl2rgb(h, sat, clamp(l, 0.04, 0.96));
+    var dd = Math.sqrt((out[0] - r) * (out[0] - r) + (out[1] - g) * (out[1] - g) +
+      (out[2] - b) * (out[2] - b));
+    if (dd < 0.32) return negativeOf(r, g, b);
+    return out;
+  }
+
+  function smooth(e0, e1, x) {
+    var s = clamp((x - e0) / (e1 - e0), 0, 1);
+    return s * s * (3 - 2 * s);
+  }
+  function cpuScale() {
+    if (interacting) return 0.4;
+    return S.ss >= 2 ? 2 : 1;
+  }
+  function hexRGB(hex) {
+    var n = parseInt(hex.slice(1), 16);
+    return [((n >> 16) & 255) / 255, ((n >> 8) & 255) / 255, (n & 255) / 255];
+  }
+
+  /* ==================================================================== */
+  /*  Backend selection                                                   */
+  /* ==================================================================== */
+  function precisionStrained() {
+    /* float32 keeps ~24 bits of mantissa, so a coordinate loses detail once
+       the pixel step falls below an ulp of that coordinate. What matters is
+       the largest coordinate ON SCREEN, not a fixed floor: a view centred on
+       the origin holds tiny numbers that float32 resolves happily however far
+       you zoom, while a view centred far out runs out of mantissa early. */
+    var upp = 1 / (S.ppu * dpr);
+    var halfSpan = Math.max(Wc, Hc) * 0.5 / S.ppu;
+    var mag = Math.max(halfSpan, Math.abs(S.cx), Math.abs(S.cy));
+    return upp / mag < 3e-7;
+  }
+
+  function wantGPU() {
+    if (S.backendPref === 'cpu') return false;
+    if (Date.now() < gpuBlockedUntil) return false;
+    if (!gpuSupported) return false;
+    if (S.backendPref === 'gpu') return true;
+    return !precisionStrained();
+  }
+
+  /* Why the CPU is in charge, in the reader's terms. */
+  function backendReason() {
+    if (backend !== 'cpu') return '';
+    if (S.backendPref === 'cpu') return 'your choice';
+    if (!gpuSupported) return 'no WebGL2';
+    if (Date.now() < gpuBlockedUntil) return 'GPU recovering';
+    if (precisionStrained()) return 'past GPU precision';
+    return '';
+  }
+
+  function buildCanvas(kind) {
+    if (R) R.destroy();
+    if (canvas) canvas.remove();
+    canvas = document.createElement('canvas');
+    canvas.id = 'plot';
+    host.insertBefore(canvas, overlay);
+    var r = null;
+    if (kind === 'gpu') {
+      try { r = createGPU(canvas); } catch (e) { r = null; }
+    }
+    if (!r) {
+      canvas.remove();
+      canvas = document.createElement('canvas');
+      canvas.id = 'plot';
+      host.insertBefore(canvas, overlay);
+      r = createCPU(canvas);
+    }
+    R = r; backend = r.kind;
+    return r;
+  }
+
+  function ensureBackend() {
+    var want = wantGPU() ? 'gpu' : 'cpu';
+    if (backend === want) return false;
+    buildCanvas(want);
+    if (backend === 'gpu' && S.glsl) {
+      try { R.setExpr(S.glsl); }
+      catch (e) { note('GPU rejected this expression — using the CPU.'); buildCanvas('cpu'); }
+    }
+    resize(true);
+    return true;
+  }
+
+  /* ==================================================================== */
+  /*  Expression handling                                                 */
+  /* ==================================================================== */
+  function applyExpression(src, silent) {
+    var errEl = $('exprErr');
+    try {
+      var ast = C.parse(src);
+      var info = C.analyze(ast);
+      var glsl = C.emitGLSL(ast).src;
+      S.ast = ast; S.info = info; S.expr = src; S.glsl = glsl; S.error = null;
+      S.fn = C.compileJS(ast);
+      errEl.textContent = '';
+      errEl.classList.remove('on');
+      $('exprField').classList.remove('bad');
+      if (backend === 'gpu') {
+        try { R.setExpr(glsl); }
+        catch (err) {
+          note('That expression did not compile on the GPU. Drawing it on the CPU.');
+          gpuBlockedUntil = Date.now() + 20000;
+          ensureBackend();
+        }
+      }
+      $('timeRow').style.display = info.usesTime ? '' : 'none';
+      updatePreview(ast);
+      fieldDirty = presentDirty = true;
+      schedule();
+      return true;
+    } catch (e) {
+      S.error = e;
+      errEl.textContent = e.message + (typeof e.pos === 'number' ? ' (at ' + (e.pos + 1) + ')' : '');
+      errEl.classList.add('on');
+      $('exprField').classList.add('bad');
+      return false;
+    }
+  }
+
+  /* Draw the parse tree as maths, so precedence is visible rather than
+     guessed: x^2 - y shows y outside the exponent, x^(2-y) shows it inside.
+     MathML renders natively, which keeps the page dependency-free. */
+  var previewTeX = false;
+  function updatePreview(ast) {
+    var box = $('previewMath'), plain = $('previewPlain');
+    if (!box || !ast) return;
+    if (previewTeX) {
+      box.textContent = FMT.latex(ast);
+      box.className = 'tex';
+      plain.textContent = 'LaTeX \u2014 click to go back';
+    } else {
+      box.innerHTML = FMT.mathml(ast);
+      box.className = '';
+      plain.textContent = FMT.canonical(ast);
+    }
+  }
+
+  function evalOne(x, y) {
+    if (!S.fn) return null;
+    C.RT.mode = S.cont; C.RT.cont = 0; C.RT.pole = 0;
+    var v = S.fn(x, y, S.time, Math.sqrt(x * x + y * y),
+      (x === 0 && y === 0) ? 0 : Math.atan2(y, x));
+    return { v: v, cont: C.RT.cont, pole: C.RT.pole };
+  }
+
+  /* ==================================================================== */
+  /*  View                                                                */
+  /* ==================================================================== */
+  function worldFromCss(mx, my) {
+    return { x: S.cx + (mx - Wc / 2) / S.ppu, y: S.cy - (my - Hc / 2) / S.ppu };
+  }
+  function zoomAt(mx, my, factor) {
+    var before = worldFromCss(mx, my);
+    S.ppu = clamp(S.ppu * factor, 1e-6, 1e12);
+    var after = worldFromCss(mx, my);
+    S.cx += before.x - after.x;
+    S.cy += before.y - after.y;
+    S.viewTouched = true;
+    viewChanged();
+  }
+  function zoomToBox(x0, y0, x1, y1) {
+    var w = Math.abs(x1 - x0), h = Math.abs(y1 - y0);
+    if (w < 6 || h < 6) return;
+    var c = worldFromCss((x0 + x1) / 2, (y0 + y1) / 2);
+    S.ppu = clamp(S.ppu * Math.min(Wc / w, Hc / h), 1e-6, 1e12);
+    S.cx = c.x; S.cy = c.y;
+    S.viewTouched = true;
+    viewChanged();
+  }
+  function panBy(dxCss, dyCss) {
+    S.cx -= dxCss / S.ppu;
+    S.cy += dyCss / S.ppu;
+    S.viewTouched = true;
+    viewChanged();
+  }
+  function viewChanged() {
+    ensureBackend();
+    fieldDirty = presentDirty = overlayDirty = true;
+    schedule();
+    updateReadout();
+  }
+  function resetView(usePreset) {
+    var p = currentPreset();
+    S.cx = 0; S.cy = 0;
+    S.ppu = (usePreset && p) ? p.ppu : 84;
+    S.viewTouched = false;
+    viewChanged();
+  }
+
+  /* ==================================================================== */
+  /*  Sizing                                                              */
+  /* ==================================================================== */
+  function resize(force) {
+    var r = host.getBoundingClientRect();
+    var w = Math.max(64, Math.round(r.width)), h = Math.max(64, Math.round(r.height));
+    dpr = backend === 'gpu' ? Math.min(window.devicePixelRatio || 1, 2) : 1;
+    var dw = Math.round(w * dpr), dh = Math.round(h * dpr);
+    if (!force && w === Wc && h === Hc && canvas.width === dw) return;
+    Wc = w; Hc = h;
+    canvas.width = dw; canvas.height = dh;
+    canvas.style.width = w + 'px'; canvas.style.height = h + 'px';
+    overlay.width = dw; overlay.height = dh;
+    overlay.style.width = w + 'px'; overlay.style.height = h + 'px';
+    if (R) R.resize();
+    fieldDirty = presentDirty = overlayDirty = true;
+    schedule();
+  }
+
+  /* ==================================================================== */
+  /*  Grid + rubber band overlay                                          */
+  /* ==================================================================== */
+  var band = null;
+  function niceStep(span) {
+    var raw = span / 7;
+    var mag = Math.pow(10, Math.floor(Math.log10(raw)));
+    var n = raw / mag;
+    var m = n < 1.5 ? 1 : (n < 3.5 ? 2 : (n < 7.5 ? 5 : 10));
+    return m * mag;
+  }
+  function fmt(v, step) {
+    if (v === 0) return '0';
+    var dec = Math.max(0, -Math.floor(Math.log10(step)) + 1);
+    if (Math.abs(v) >= 1e6 || Math.abs(v) < 1e-5) return v.toExponential(2);
+    return v.toFixed(Math.min(dec, 8)).replace(/\.?0+$/, '');
+  }
+  function drawOverlay() {
+    var g = overlay.getContext('2d');
+    g.setTransform(1, 0, 0, 1, 0, 0);
+    g.clearRect(0, 0, overlay.width, overlay.height);
+    g.scale(dpr, dpr);
+    if (S.grid) {
+      var span = Wc / S.ppu;
+      var step = niceStep(span);
+      var x0 = Math.ceil((S.cx - Wc / 2 / S.ppu) / step) * step;
+      var y0 = Math.ceil((S.cy - Hc / 2 / S.ppu) / step) * step;
+      g.lineWidth = 1;
+      g.font = '10px ui-monospace, monospace';
+      g.textBaseline = 'top';
+      for (var x = x0; x <= S.cx + Wc / 2 / S.ppu; x += step) {
+        var px = Math.round((x - S.cx) * S.ppu + Wc / 2) + 0.5;
+        var axis = Math.abs(x) < step * 1e-6;
+        g.strokeStyle = axis ? 'rgba(255,255,255,0.55)' : 'rgba(255,255,255,0.13)';
+        g.beginPath(); g.moveTo(px, 0); g.lineTo(px, Hc); g.stroke();
+        if (!axis) {
+          g.fillStyle = 'rgba(255,255,255,0.5)';
+          g.fillText(fmt(x, step), px + 3, Hc - 14);
+        }
+      }
+      for (var y = y0; y <= S.cy + Hc / 2 / S.ppu; y += step) {
+        var py = Math.round(Hc / 2 - (y - S.cy) * S.ppu) + 0.5;
+        var ax2 = Math.abs(y) < step * 1e-6;
+        g.strokeStyle = ax2 ? 'rgba(255,255,255,0.55)' : 'rgba(255,255,255,0.13)';
+        g.beginPath(); g.moveTo(0, py); g.lineTo(Wc, py); g.stroke();
+        if (!ax2) {
+          g.fillStyle = 'rgba(255,255,255,0.5)';
+          g.fillText(fmt(y, step), 4, py + 3);
+        }
+      }
+    }
+    if (band) {
+      var bx = Math.min(band.x0, band.x1), by = Math.min(band.y0, band.y1);
+      var bw = Math.abs(band.x1 - band.x0), bh = Math.abs(band.y1 - band.y0);
+      g.fillStyle = 'rgba(232,176,75,0.12)';
+      g.fillRect(bx, by, bw, bh);
+      g.strokeStyle = 'rgba(232,176,75,0.95)';
+      g.lineWidth = 1;
+      g.strokeRect(bx + 0.5, by + 0.5, bw, bh);
+    }
+  }
+
+  /* ==================================================================== */
+  /*  Palette rail                                                        */
+  /* ==================================================================== */
+  function drawRail() {
+    var g = rail.getContext('2d');
+    var scale = Math.min(window.devicePixelRatio || 1, 3);
+    var cssH = rail.clientHeight || 300;
+    var w = Math.round(20 * scale), h = Math.max(1, Math.round(cssH * scale));
+    rail.width = w; rail.height = h;
+    var A = hexRGB(S.colA), B = hexRGB(S.colB);
+    for (var i = 0; i < h; i++) {
+      var u = 1 - (i + 0.5) / h;              // 1 at the top, 0 at the bottom
+      var uu = u + S.phase; uu -= Math.floor(uu);
+      var c = C.paletteRGB(S.palette, uu, A, B, S.bands);
+      g.fillStyle = 'rgb(' + (c[0] * 255 | 0) + ',' + (c[1] * 255 | 0) + ',' + (c[2] * 255 | 0) + ')';
+      g.fillRect(0, i, w, 1);
+    }
+    /* The ramp repeats every 1/freq in z, so that is what the cap reports. */
+    var top = $('railTop');
+    if (top) {
+      var period = 1 / S.freq;
+      top.textContent = period >= 100 || period < 0.01
+        ? period.toExponential(1) : period.toFixed(2);
+    }
+  }
+
+
+  /* ==================================================================== */
+  /*  Frame loop                                                          */
+  /* ==================================================================== */
+  function schedule() { if (!rafId) rafId = requestAnimationFrame(frame); }
+  var lastT = performance.now(), lastRail = 0, perfEl = null;
+
+  function frame(now) {
+    rafId = 0;
+    var dt = Math.min(0.1, (now - lastT) / 1000);
+    lastT = now;
+
+    if (S.cycling) { S.phase = (S.phase + S.cycleSpeed * dt) % 1; presentDirty = true; syncPhaseUI(); }
+    if (S.animTime && S.info && S.info.usesTime) {
+      S.time += S.timeSpeed * dt;
+      fieldDirty = presentDirty = true;
+      $('timeVal').textContent = S.time.toFixed(2);
+    }
+
+    if (S.fn && (fieldDirty || presentDirty)) {
+      var t0 = performance.now();
+      if (fieldDirty) { R.renderField(); fieldDirty = false; }
+      if (presentDirty) { R.present(); presentDirty = false; }
+      lastRenderMs = performance.now() - t0;
+      /* The grid only moves when the view does, and the rail only needs to
+         keep up with the eye — neither belongs in every rotation frame. */
+      if (overlayDirty) { drawOverlay(); overlayDirty = false; }
+      if (S.cycling && now - lastRail > 50) { drawRail(); lastRail = now; }
+      if (!perfEl) perfEl = $('perf');
+      perfEl.textContent = lastRenderMs.toFixed(1) + ' ms';
+    }
+    if (S.cycling || (S.animTime && S.info && S.info.usesTime)) schedule();
+  }
+
+  var phasePair = null;
+  function syncPhaseUI() {
+    var a = document.activeElement;
+    if (phasePair && a !== $('phase') && a !== $('phaseNum')) {
+      phasePair.set(Math.round(S.phase * 1000) / 1000);
+    }
+  }
+
+  /* ==================================================================== */
+  /*  Contour under the pointer                                           */
+  /* ==================================================================== */
+  function hideHit() {
+    var el = $('hitLabel');
+    if (el) el.classList.remove('on');
+    if (S.hiOn) { S.hiOn = false; presentDirty = true; schedule(); }
+  }
+
+  /* Find the contour the pointer is sitting on, thicken it, and float its
+     value beside the cursor. Only the colour pass re-runs. */
+  function updateHit() {
+    var el = $('hitLabel');
+    if (!el) return;
+    if (!S.lines || !cursor || !S.fn) { hideHit(); return; }
+
+    var wpt = worldFromCss(cursor.x, cursor.y);
+    var here = evalOne(wpt.x, wpt.y);
+    if (!here || C.bad(here.v)) { hideHit(); return; }
+
+    /* |grad v| per CSS pixel, by finite difference at the cursor */
+    var h = 1 / S.ppu;
+    var ax = evalOne(wpt.x + h, wpt.y), ay = evalOne(wpt.x, wpt.y + h);
+    if (!ax || !ay || C.bad(ax.v) || C.bad(ay.v)) { hideHit(); return; }
+    var grad = Math.abs(ax.v - here.v) + Math.abs(ay.v - here.v);
+
+    var hit = SETS.nearest(here.v, S.set, S.setN);
+    if (!hit) { hideHit(); return; }
+    var px = Math.abs(here.v - hit.value) / Math.max(grad, 1e-20);
+    if (!(px < Math.max(9, S.lineW * 3))) { hideHit(); return; }
+
+    if (!S.hiOn || S.hiVal !== hit.value) {
+      S.hiOn = true; S.hiVal = hit.value;
+      presentDirty = true; schedule();
+    }
+    el.textContent = hit.label;
+    el.classList.add('on');
+    /* flip to the other side of the cursor rather than run off the edge */
+    var lw = el.offsetWidth || 40;
+    var left = cursor.x + 14;
+    if (left + lw > Wc - 4) left = Math.max(4, cursor.x - 14 - lw);
+    el.style.left = left + 'px';
+    el.style.top = clamp(cursor.y - 30, 4, Math.max(4, Hc - 26)) + 'px';
+  }
+
+  /* ==================================================================== */
+  /*  Readout                                                             */
+  /* ==================================================================== */
+  var cursor = null;
+  function updateReadout() {
+    var el = $('readout');
+    var span = Wc / S.ppu;
+    var zoomTxt = 'span ' + fmt(span, span / 100) + '  \u00b7  ' + backend.toUpperCase();
+    var n = (R && R.getNote ? R.getNote() : '') || backendReason();
+    if (n) zoomTxt += ' (' + n + ')';
+    if (!cursor) { el.innerHTML = '<span class="dim">' + zoomTxt + '</span>'; return; }
+    var w = worldFromCss(cursor.x, cursor.y);
+    var res = evalOne(w.x, w.y);
+    var vTxt;
+    if (!res) vTxt = '—';
+    else if (C.bad(res.v)) vTxt = res.pole ? 'pole' : 'undefined';
+    else vTxt = res.v.toFixed(6) + (res.cont ? ' *' : '');
+    el.innerHTML =
+      '<b>x</b> ' + fmt(w.x, span / 1000) +
+      '   <b>y</b> ' + fmt(w.y, span / 1000) +
+      '   <b>z</b> ' + vTxt +
+      '<br><span class="dim">' + zoomTxt + '</span>';
+  }
+
+  /* ==================================================================== */
+  /*  Pointer interaction                                                 */
+  /* ==================================================================== */
+  var pointers = new Map(), dragMode = null, dragStart = null, pinch = null;
+  var navMode = 'box';
+
+  function localPos(e) {
+    var r = host.getBoundingClientRect();
+    return { x: e.clientX - r.left, y: e.clientY - r.top };
+  }
+  function markInteracting() {
+    interacting = true;
+    clearTimeout(idleTimer);
+    idleTimer = setTimeout(function () {
+      interacting = false;
+      fieldDirty = presentDirty = true;
+      schedule();
+    }, 160);
+  }
+
+  host.addEventListener('pointerdown', function (e) {
+    host.setPointerCapture(e.pointerId);
+    pointers.set(e.pointerId, localPos(e));
+    if (pointers.size === 2) {
+      var pts = Array.from(pointers.values());
+      pinch = {
+        d: Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y),
+        mx: (pts[0].x + pts[1].x) / 2, my: (pts[0].y + pts[1].y) / 2
+      };
+      dragMode = null; band = null; drawOverlay();
+      return;
+    }
+    var p = localPos(e);
+    var wantPan = e.shiftKey || e.button === 1 || e.button === 2 ||
+      navMode === 'pan' || e.pointerType === 'touch';
+    if (wantPan) { dragMode = 'pan'; dragStart = p; host.style.cursor = 'grabbing'; }
+    else { dragMode = 'box'; dragStart = p; band = { x0: p.x, y0: p.y, x1: p.x, y1: p.y }; }
+    e.preventDefault();
+  });
+
+  host.addEventListener('pointermove', function (e) {
+    var p = localPos(e);
+    cursor = p;
+    if (pointers.has(e.pointerId)) pointers.set(e.pointerId, p);
+
+    if (pinch && pointers.size === 2) {
+      var pts = Array.from(pointers.values());
+      var d = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
+      var mx = (pts[0].x + pts[1].x) / 2, my = (pts[0].y + pts[1].y) / 2;
+      if (pinch.d > 1) {
+        panBy(mx - pinch.mx, my - pinch.my);
+        zoomAt(mx, my, d / pinch.d);
+      }
+      pinch = { d: d, mx: mx, my: my };
+      markInteracting();
+      return;
+    }
+    if (dragMode === 'pan') {
+      panBy(p.x - dragStart.x, p.y - dragStart.y);
+      dragStart = p;
+      markInteracting();
+    } else if (dragMode === 'box') {
+      band.x1 = p.x; band.y1 = p.y;
+      drawOverlay();
+    }
+    updateReadout();
+    updateHit();
+  });
+
+  function endPointer(e) {
+    pointers.delete(e.pointerId);
+    if (pointers.size < 2) pinch = null;
+    if (dragMode === 'box' && band) {
+      zoomToBox(band.x0, band.y0, band.x1, band.y1);
+      band = null; drawOverlay();
+    }
+    dragMode = null;
+    host.style.cursor = '';
+  }
+  host.addEventListener('pointerup', endPointer);
+  host.addEventListener('pointercancel', endPointer);
+  host.addEventListener('pointerleave', function () {
+    cursor = null; updateReadout(); hideHit();
+  });
+  host.addEventListener('contextmenu', function (e) { e.preventDefault(); });
+
+  host.addEventListener('wheel', function (e) {
+    e.preventDefault();
+    var p = localPos(e);
+    var unit = e.deltaMode === 1 ? 16 : (e.deltaMode === 2 ? Hc : 1);
+    var f = Math.exp(-e.deltaY * unit * 0.0018);
+    zoomAt(p.x, p.y, clamp(f, 0.2, 5));
+    markInteracting();
+  }, { passive: false });
+
+  host.addEventListener('dblclick', function (e) {
+    var p = localPos(e);
+    zoomAt(p.x, p.y, e.altKey ? 0.5 : 2);
+  });
+
+  window.addEventListener('keydown', function (e) {
+    if (/^(INPUT|SELECT|TEXTAREA)$/.test(document.activeElement.tagName)) return;
+    var step = 60;
+    if (e.key === '+' || e.key === '=') zoomAt(Wc / 2, Hc / 2, 1.3);
+    else if (e.key === '-' || e.key === '_') zoomAt(Wc / 2, Hc / 2, 1 / 1.3);
+    else if (e.key === 'ArrowLeft') panBy(step, 0);
+    else if (e.key === 'ArrowRight') panBy(-step, 0);
+    else if (e.key === 'ArrowUp') panBy(0, step);
+    else if (e.key === 'ArrowDown') panBy(0, -step);
+    else if (e.key === '0') resetView(true);
+    else if (e.key.toLowerCase() === 'c') { $('cycle').click(); }
+    else if (e.key.toLowerCase() === 'l') { $('lines').click(); }
+    else if (e.key.toLowerCase() === 'g') { $('grid').click(); }
+    else return;
+    e.preventDefault();
+  });
+
+  /* ==================================================================== */
+  /*  Controls                                                            */
+  /* ==================================================================== */
+  var CUSTOM = '__custom__';
+
+  function canon(s) { return C.normalize(s).replace(/\s+/g, '').toLowerCase(); }
+
+  function currentPreset() {
+    var want = canon(S.expr);
+    for (var i = 0; i < C.PRESETS.length; i++) {
+      var items = C.PRESETS[i].items;
+      for (var j = 0; j < items.length; j++) {
+        if (canon(items[j].expr) === want) return items[j];
+      }
+    }
+    return null;
+  }
+
+  function buildPresetMenu() {
+    var sel = $('preset');
+    var custom = document.createElement('option');
+    custom.value = CUSTOM; custom.textContent = 'custom*';
+    sel.appendChild(custom);
+    C.PRESETS.forEach(function (g) {
+      var og = document.createElement('optgroup');
+      og.label = g.group;
+      g.items.forEach(function (p) {
+        var o = document.createElement('option');
+        o.value = p.expr; o.textContent = p.name;
+        og.appendChild(o);
+      });
+      sel.appendChild(og);
+    });
+  }
+
+  function syncPresetMenu() {
+    var p = currentPreset();
+    $('preset').value = p ? p.expr : CUSTOM;
+    $('preset').classList.toggle('custom', !p);
+  }
+
+  function note(msg) {
+    var el = $('note');
+    el.textContent = msg;
+    el.classList.add('on');
+    clearTimeout(el._t);
+    el._t = setTimeout(function () { el.classList.remove('on'); }, 4200);
+  }
+
+  function bind(id, ev, fn) { $(id).addEventListener(ev, fn); }
+
+  /* Every slider carries a number box with steppers; each edits the same
+     value and keeps the other in step. */
+  function pair(id, apply) {
+    var range = $(id), num = $(id + 'Num');
+    var lo = parseFloat(range.min), hi = parseFloat(range.max);
+    function push(v, from) {
+      v = clamp(v, lo, hi);
+      if (from !== 'range') range.value = String(v);
+      if (from !== 'num') num.value = String(v);
+      apply(v);
+    }
+    range.addEventListener('input', function () { push(parseFloat(this.value), 'range'); });
+    num.addEventListener('input', function () {
+      var v = parseFloat(this.value);
+      if (isFinite(v)) push(v, 'num');
+    });
+    num.addEventListener('blur', function () {
+      var v = parseFloat(this.value);
+      push(isFinite(v) ? v : parseFloat(range.value), null);
+    });
+    return {
+      set: function (v) {
+        v = clamp(v, lo, hi);
+        range.value = String(v); num.value = String(v);
+      }
+    };
+  }
+
+  function wireControls() {
+    buildPresetMenu();
+
+    C.PALETTES.forEach(function (p, i) {
+      var o = document.createElement('option');
+      o.value = String(i); o.textContent = p.name;
+      $('palette').appendChild(o);
+    });
+
+    bind('preset', 'change', function () {
+      if (this.value === CUSTOM) return;
+      $('exprField').value = this.value;
+      if (applyExpression(this.value)) {
+        var p = currentPreset();
+        if (p && !S.viewTouched) { S.cx = 0; S.cy = 0; S.ppu = p.ppu; viewChanged(); }
+        syncPresetMenu();
+      }
+    });
+
+    bind('exprField', 'input', function () {
+      applyExpression(this.value);
+      syncPresetMenu();
+    });
+
+    bind('palette', 'change', function () {
+      S.palette = parseInt(this.value, 10);
+      var duo = C.PALETTES[S.palette].duo;
+      $('duoRow').style.display = duo ? '' : 'none';
+      $('bandRow').style.display = C.PALETTES[S.palette].id === 'bands' ? '' : 'none';
+      presentDirty = true; drawRail(); schedule();
+    });
+    bind('colA', 'input', function () { S.colA = this.value; presentDirty = true; drawRail(); schedule(); });
+    bind('colB', 'input', function () { S.colB = this.value; presentDirty = true; drawRail(); schedule(); });
+    pair('bands', function (v) {
+      S.bands = Math.round(v);
+      presentDirty = true; drawRail(); schedule();
+    });
+    pair('freq', function (v) {
+      S.freq = v;
+      presentDirty = true; drawRail(); schedule();
+    });
+    bind('cycle', 'change', function () {
+      S.cycling = this.checked;
+      $('speedRow').style.display = this.checked ? '' : 'none';
+      lastT = performance.now();
+      schedule();
+    });
+    pair('speed', function (v) { S.cycleSpeed = v; });
+    phasePair = pair('phase', function (v) {
+      S.phase = v;
+      presentDirty = true; drawRail(); schedule();
+    });
+
+    SETS.SETS.forEach(function (set, i) {
+      var o = document.createElement('option');
+      o.value = String(i); o.textContent = set.name;
+      $('setKind').appendChild(o);
+    });
+    bind('setKind', 'change', function () {
+      S.set = parseInt(this.value, 10);
+      var set = SETS.SETS[S.set];
+      var box = $('setN');
+      box.style.display = set.param ? '' : 'none';
+      if (set.param) {
+        /* the parameter means something different per set, so the stepper
+           bounds follow it: a spacing, a base, or a largest denominator */
+        var b = set.id === 'multiples' ? { min: 0.01, max: 100, step: 0.25 }
+          : set.id === 'powers' ? { min: 1.05, max: 100, step: 0.5 }
+            : { min: 1, max: 24, step: 1 };
+        box.min = String(b.min); box.max = String(b.max); box.step = String(b.step);
+        box.title = set.name;
+        S.setN = set.def;
+        box.value = String(set.def);
+      }
+      $('parityWrap').style.display = set.parity ? '' : 'none';
+      presentDirty = true; schedule();
+    });
+    bind('setN', 'input', function () {
+      var v = parseFloat(this.value);
+      if (isFinite(v)) { S.setN = v; presentDirty = true; schedule(); }
+    });
+    bind('lines', 'change', function () {
+      S.lines = this.checked;
+      $('lineOpts').style.display = this.checked ? '' : 'none';
+      if (!this.checked) hideHit();
+      presentDirty = true; schedule();
+    });
+    pair('lineW', function (v) {
+      S.lineW = v;
+      presentDirty = true; schedule();
+    });
+    bind('parity', 'change', function () { S.parity = this.checked; presentDirty = true; schedule(); });
+
+    bind('cont', 'change', function () {
+      S.cont = parseInt(this.value, 10);
+      $('markRow').style.display = S.cont === 0 ? 'none' : '';
+      fieldDirty = presentDirty = true; schedule();
+    });
+    bind('repair', 'change', function () { S.repair = this.checked; fieldDirty = presentDirty = true; schedule(); });
+    bind('markCont', 'change', function () { S.markCont = this.checked; presentDirty = true; schedule(); });
+
+    bind('aa', 'change', function () { S.aa = this.checked; presentDirty = true; schedule(); });
+    bind('ss', 'change', function () {
+      S.ss = parseInt(this.value, 10);
+      if (R) R.resize();
+      fieldDirty = presentDirty = true; schedule();
+    });
+    bind('grid', 'change', function () { S.grid = this.checked; drawOverlay(); });
+    bind('backend', 'change', function () {
+      S.backendPref = this.value;
+      ensureBackend();
+      updateReadout();
+      fieldDirty = presentDirty = true; schedule();
+    });
+
+    bind('animT', 'change', function () {
+      S.animTime = this.checked;
+      lastT = performance.now();
+      schedule();
+    });
+    pair('tSpeed', function (v) { S.timeSpeed = v; });
+    bind('tReset', 'click', function () {
+      S.time = 0; $('timeVal').textContent = '0.00';
+      fieldDirty = presentDirty = true; schedule();
+    });
+
+    bind('navBox', 'click', function () { setNav('box'); });
+    bind('navPan', 'click', function () { setNav('pan'); });
+    bind('reset', 'click', function () { resetView(true); });
+    bind('save', 'click', savePNG);
+    bind('panelToggle', 'click', function () {
+      document.body.classList.toggle('panel-open');
+    });
+    bind('preview', 'click', function () {
+      previewTeX = !previewTeX;
+      if (S.ast) updatePreview(S.ast);
+    });
+  }
+
+  function setNav(m) {
+    navMode = m;
+    $('navBox').classList.toggle('on', m === 'box');
+    $('navPan').classList.toggle('on', m === 'pan');
+    host.classList.toggle('pan', m === 'pan');
+  }
+
+  function savePNG() {
+    fieldDirty = true; presentDirty = true;
+    if (S.fn) { R.renderField(); R.present(); fieldDirty = presentDirty = false; }
+    drawOverlay();
+    var out = document.createElement('canvas');
+    out.width = canvas.width; out.height = canvas.height;
+    var g = out.getContext('2d');
+    if (R.readPixels) {
+      var px = R.readPixels();
+      var id = g.createImageData(px.w, px.h);
+      var rowBytes = px.w * 4;
+      for (var y = 0; y < px.h; y++) {
+        var src = (px.h - 1 - y) * rowBytes;
+        id.data.set(px.data.subarray(src, src + rowBytes), y * rowBytes);
+      }
+      g.putImageData(id, 0, 0);
+    } else {
+      g.drawImage(canvas, 0, 0);
+    }
+    g.drawImage(overlay, 0, 0);
+    out.toBlob(function (blob) {
+      var a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'ocg-' + Date.now() + '.png';
+      a.click();
+      setTimeout(function () { URL.revokeObjectURL(a.href); }, 4000);
+    });
+  }
+
+  /* ==================================================================== */
+  /*  Boot                                                                */
+  /* ==================================================================== */
+  function boot() {
+    wireControls();
+    /* adopt whatever the markup declares, so defaults live in one place */
+    S.markCont = $('markCont').checked;
+    S.repair = $('repair').checked;
+    S.aa = $('aa').checked;
+    S.grid = $('grid').checked;
+    buildCanvas('gpu');
+    if (backend !== 'gpu') {
+      gpuSupported = false;
+      note('WebGL2 is unavailable here \u2014 running on the CPU.');
+    }
+    resize(true);
+    $('exprField').value = S.expr;
+    applyExpression(S.expr);
+    syncPresetMenu();
+    setNav('box');
+    S.ppu = 84;
+    drawRail();
+    drawOverlay();
+    updateReadout();
+    schedule();
+
+    var ro = new ResizeObserver(function () { resize(false); drawRail(); });
+    ro.observe(host);
+    window.addEventListener('resize', function () { resize(false); drawRail(); });
+  }
+
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
+  else boot();
+})();
+</script>
+</body>
+</html>
+
