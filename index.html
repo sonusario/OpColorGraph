@@ -94,6 +94,110 @@ main {
 #panel::-webkit-scrollbar { width: 8px; }
 #panel::-webkit-scrollbar-thumb { background: var(--rule-2); }
 
+/* ---------------------------------------------------------------- tabs */
+#tabs {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  display: flex;
+  background: var(--panel);
+  border-bottom: 1px solid var(--rule);
+}
+#tabs button {
+  flex: 1;
+  border: none;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  background: transparent;
+  padding: 9px 2px;
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  color: var(--dim);
+}
+#tabs button:hover { color: var(--text); }
+#tabs button.on { color: var(--accent); border-bottom-color: var(--accent); }
+.tab { display: none; }
+.tab.on { display: block; }
+
+.hint {
+  margin: 8px 0 0;
+  color: var(--dim);
+  font-size: 10px;
+  line-height: 1.55;
+}
+
+/* ------------------------------------------- function library + history */
+select[size] {
+  height: auto;
+  padding: 4px;
+  background-image: none;
+}
+select[size] option { padding: 3px 4px; }
+
+#histMenu {
+  display: none;
+  max-height: 168px;
+  overflow-y: auto;
+  margin-top: 6px;
+  border: 1px solid var(--rule-2);
+  border-radius: 2px;
+  background: var(--sunk);
+  scrollbar-width: thin;
+}
+#histMenu.on { display: block; }
+#histMenu button {
+  display: block;
+  width: 100%;
+  border: none;
+  border-bottom: 1px solid var(--rule);
+  border-radius: 0;
+  background: transparent;
+  text-align: left;
+  padding: 6px 8px;
+  font-size: 11px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+#histMenu button:hover { background: var(--panel-2); color: var(--accent); }
+#histMenu .empty { padding: 8px; color: var(--dim); font-size: 11px; }
+
+#histBtn { flex: 0 0 30px; padding: 6px 0; }
+
+#defErr, #exprErr {
+  display: none;
+  margin-top: 6px;
+  color: var(--bad);
+  font-size: 11px;
+  line-height: 1.4;
+}
+#defErr.on, #exprErr.on { display: block; }
+#defEdit { margin-top: 8px; }
+
+.paramRow { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.paramRow .pname {
+  flex: 0 0 68px;
+  color: var(--accent);
+  font-size: 11px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* --------------------------------------------- note along the plot foot */
+#scaleNoteBar {
+  position: absolute;
+  left: 0; right: 0; bottom: 0;
+  padding: 6px 12px;
+  background: linear-gradient(to top, rgba(10,13,19,0.92), rgba(10,13,19,0));
+  color: var(--text);
+  font-size: 11px;
+  text-align: center;
+  pointer-events: none;
+  display: none;
+}
+#scaleNoteBar.on { display: block; }
+body.has-note #readout { bottom: 34px; }
+
 section {
   border-bottom: 1px solid var(--rule);
   padding: 12px var(--pad) 14px;
@@ -321,6 +425,7 @@ details[open] summary::before { content: "\2212 "; }
 #readout {
   position: absolute;
   left: 10px; bottom: 10px;
+  transition: bottom .15s;
   padding: 6px 9px;
   background: rgba(10, 13, 19, 0.78);
   border: 1px solid var(--rule);
@@ -410,17 +515,76 @@ details[open] summary::before { content: "\2212 "; }
 <main>
   <div id="panel">
 
-    <section>
-      <h2>Equation</h2>
-      <div class="row"><select id="preset" aria-label="Preset equation"></select></div>
-      <input type="text" id="exprField" spellcheck="false" autocapitalize="off"
-             autocomplete="off" aria-label="Equation" value="x / y">
-      <div id="exprErr" role="alert"></div>
-      <div id="preview" title="How the expression was parsed. Click to see the LaTeX.">
-        <div id="previewMath"></div>
-        <div id="previewPlain"></div>
-      </div>
-      <div id="timeRow" style="display:none">
+    <nav id="tabs" role="tablist">
+      <button data-tab="fn" class="on">Function</button>
+      <button data-tab="view">View</button>
+      <button data-tab="colour">Colour</button>
+      <button data-tab="marks">Marks</button>
+      <button data-tab="fx">Effects</button>
+      <button data-tab="out">Export</button>
+    </nav>
+
+    <!-- ------------------------------------------------------ Function -->
+    <div class="tab on" data-tab="fn">
+      <section>
+        <h2>Library</h2>
+        <div class="row">
+          <select id="defList" size="4" class="grow" aria-label="Defined functions"></select>
+        </div>
+        <div class="btns">
+          <button id="defAdd">Add</button>
+          <button id="defDup">Copy</button>
+          <button id="defDel">Delete</button>
+        </div>
+        <div class="row" style="margin-top:9px">
+          <label class="check"><input type="checkbox" id="useLibrary"><span>Graph the selected entry</span></label>
+        </div>
+        <div id="defEditRow" style="display:none">
+          <input type="text" id="defEdit" spellcheck="false" autocapitalize="off"
+                 autocomplete="off" aria-label="Definition" placeholder="f(u, v) = sin(u) + v">
+          <div id="defErr" role="alert"></div>
+        </div>
+      </section>
+
+      <section>
+        <h2>Graphed expression</h2>
+        <div class="row"><select id="preset" aria-label="Preset equation"></select></div>
+        <div class="row">
+          <input type="text" id="exprField" spellcheck="false" autocapitalize="off"
+                 autocomplete="off" aria-label="Equation" value="x / y" class="grow">
+          <button id="histBtn" title="Previous formulas you have used">&#9662;</button>
+        </div>
+        <div id="histMenu"></div>
+        <div id="exprErr" role="alert"></div>
+        <div id="preview" title="How the expression was parsed. Click to see the LaTeX.">
+          <div id="previewMath"></div>
+          <div id="previewPlain"></div>
+        </div>
+      </section>
+
+      <section id="paramSection" style="display:none">
+        <h2>Free variables</h2>
+        <div id="paramRows"></div>
+      </section>
+
+      <section id="recurseSection" style="display:none">
+        <h2>Self-reference</h2>
+        <div class="row">
+          <label>Unwind depth</label>
+          <input type="range" id="recDepth" class="grow" min="0" max="16" step="1" value="4">
+          <input type="number" id="recDepthNum" class="num" min="0" max="16" step="1" value="4">
+        </div>
+        <div class="row">
+          <label>Seed value</label>
+          <input type="range" id="recSeed" class="grow" min="-8" max="8" step="0.1" value="0">
+          <input type="number" id="recSeedNum" class="num" min="-8" max="8" step="0.1" value="0">
+        </div>
+        <p class="hint">A function that reaches itself is expanded this many times;
+           the innermost call becomes the seed.</p>
+      </section>
+
+      <section id="timeRow" style="display:none">
+        <h2>Time</h2>
         <div class="row">
           <label>Time t</label>
           <label class="check"><input type="checkbox" id="animT"><span>Run</span></label>
@@ -433,142 +597,408 @@ details[open] summary::before { content: "\2212 "; }
           <input type="range" id="tSpeed" class="grow" min="0.01" max="4" step="0.01" value="1">
           <input type="number" id="tSpeedNum" class="num" min="0.01" max="4" step="0.01" value="1">
         </div>
-      </div>
-    </section>
+      </section>
+    </div>
 
-    <section>
-      <h2>View</h2>
-      <div class="btns">
-        <button id="navBox">Zoom box</button>
-        <button id="navPan">Pan</button>
-        <button id="reset">Reset</button>
-      </div>
-      <div class="row" style="margin-top:9px">
-        <label class="check"><input type="checkbox" id="grid" checked><span>Axes &amp; grid</span></label>
-      </div>
-    </section>
-
-    <section>
-      <h2>Colour</h2>
-      <div class="row"><select id="palette" aria-label="Colour theme"></select></div>
-      <div class="row" id="duoRow" style="display:none">
-        <label>Two colours</label>
-        <input type="color" id="colA" value="#12224f">
-        <input type="color" id="colB" value="#f3c969">
-      </div>
-      <div class="row" id="bandRow" style="display:none">
-        <label>Bands</label>
-        <input type="range" id="bands" class="grow" min="2" max="24" step="1" value="6">
-        <input type="number" id="bandsNum" class="num" min="2" max="24" step="1" value="6">
-      </div>
-      <div class="row">
-        <label>Cycles / unit</label>
-        <input type="range" id="freq" class="grow" min="0.05" max="16" step="0.05" value="1">
-        <input type="number" id="freqNum" class="num" min="0.05" max="16" step="0.05" value="1">
-      </div>
-      <div class="row">
-        <label>Offset</label>
-        <input type="range" id="phase" class="grow" min="0" max="1" step="0.001" value="0">
-        <input type="number" id="phaseNum" class="num" min="0" max="1" step="0.01" value="0">
-      </div>
-      <div class="row">
-        <label class="check"><input type="checkbox" id="cycle"><span>Rotate colours</span></label>
-      </div>
-      <div class="row" id="speedRow" style="display:none">
-        <label>Turns / second</label>
-        <input type="range" id="speed" class="grow" min="0.01" max="2" step="0.01" value="0.12">
-        <input type="number" id="speedNum" class="num" min="0.01" max="2" step="0.01" value="0.12">
-      </div>
-    </section>
-
-    <section>
-      <h2>Numerical solutions</h2>
-      <div class="row">
-        <label class="check"><input type="checkbox" id="lines"><span>Mark numerical solutions</span></label>
-      </div>
-      <div id="lineOpts" style="display:none">
+    <!-- ---------------------------------------------------------- View -->
+    <div class="tab" data-tab="view">
+      <section>
+        <h2>Navigation</h2>
+        <div class="btns">
+          <button id="navBox">Zoom box</button>
+          <button id="navPan">Pan</button>
+          <button id="reset">Reset</button>
+        </div>
+        <div class="row" style="margin-top:9px">
+          <label>Magnification</label>
+          <span class="val grow" id="zoomVal" style="text-align:left">1.00&times;</span>
+        </div>
         <div class="row">
-          <select id="setKind" class="grow" aria-label="Which numbers to mark"></select>
-          <input type="number" id="setN" class="num" min="0.01" max="24" step="1" value="2"
-                 aria-label="Set parameter" style="display:none">
+          <label>Span</label>
+          <span class="val grow" id="spanVal" style="text-align:left">&mdash;</span>
+        </div>
+      </section>
+
+      <section>
+        <h2>Auto zoom</h2>
+        <div class="btns">
+          <button id="autoIn">Zoom in</button>
+          <button id="autoOut">Zoom out</button>
+          <button id="autoStop">Stop</button>
+        </div>
+        <div class="row" style="margin-top:9px">
+          <label>Speed</label>
+          <input type="range" id="autoSpeed" class="grow" min="0.05" max="8" step="0.05" value="1">
+          <input type="number" id="autoSpeedNum" class="num" min="0.05" max="8" step="0.05" value="1">
+        </div>
+        <div class="row">
+          <label class="check"><input type="checkbox" id="autoToCursor" checked><span>Aim at the pointer</span></label>
+        </div>
+        <div class="row">
+          <label class="check"><input type="checkbox" id="flickZoom" checked><span>Flick the wheel to start</span></label>
+        </div>
+        <p class="hint">A fast scroll starts a continuous zoom; any click, key or
+           ordinary scroll stops it.</p>
+      </section>
+
+      <section>
+        <h2>Guides</h2>
+        <div class="row">
+          <label class="check"><input type="checkbox" id="grid" checked><span>Axes &amp; grid</span></label>
+        </div>
+        <div class="row">
+          <label>Grid opacity</label>
+          <input type="range" id="gridAlpha" class="grow" min="0" max="1" step="0.01" value="1">
+          <input type="number" id="gridAlphaNum" class="num" min="0" max="1" step="0.05" value="1">
+        </div>
+        <div class="row">
+          <label class="check"><input type="checkbox" id="boldAxes" checked><span>Bold x and y axes</span></label>
+        </div>
+        <div class="row">
+          <label class="check"><input type="checkbox" id="reticle"><span>Pointer reticle</span></label>
+        </div>
+        <div class="row">
+          <label class="check"><input type="checkbox" id="scaleNote"><span>Scale-of-the-universe note</span></label>
+        </div>
+      </section>
+
+      <section>
+        <h2>Quality</h2>
+        <div class="row">
+          <label>Renderer</label>
+          <select id="backend" class="grow">
+            <option value="auto" selected>Auto</option>
+            <option value="hybrid">Hybrid</option>
+            <option value="gpu">GPU</option>
+            <option value="cpu">CPU</option>
+          </select>
+        </div>
+        <div class="row">
+          <label>Samples</label>
+          <select id="ss" class="grow">
+            <option value="1" selected>1 per pixel</option>
+            <option value="2">4 per pixel</option>
+            <option value="3">9 per pixel</option>
+          </select>
+        </div>
+        <div class="row">
+          <label class="check"><input type="checkbox" id="aa"><span>Band-limit fast regions</span></label>
+        </div>
+        <p class="hint" id="hybridHint" style="display:none">Hybrid draws on the GPU
+           while you move, then redraws in double precision once you stop.</p>
+      </section>
+    </div>
+
+    <!-- -------------------------------------------------------- Colour -->
+    <div class="tab" data-tab="colour">
+      <section>
+        <h2>Theme</h2>
+        <div class="row"><select id="palette" aria-label="Colour theme"></select></div>
+        <div class="row" id="duoRow" style="display:none">
+          <label>Two colours</label>
+          <input type="color" id="colA" value="#12224f">
+          <input type="color" id="colB" value="#f3c969">
+        </div>
+        <div class="row" id="bandRow" style="display:none">
+          <label>Bands</label>
+          <input type="range" id="bands" class="grow" min="2" max="24" step="1" value="6">
+          <input type="number" id="bandsNum" class="num" min="2" max="24" step="1" value="6">
+        </div>
+      </section>
+
+      <section>
+        <h2>Banding</h2>
+        <div class="row">
+          <label>Cycles / unit</label>
+          <input type="range" id="freq" class="grow" min="0.05" max="16" step="0.05" value="1">
+          <input type="number" id="freqNum" class="num" min="0.05" max="16" step="0.05" value="1">
+        </div>
+        <div class="row">
+          <label>As you zoom</label>
+          <select id="freqMode" class="grow">
+            <option value="0" selected>Fixed in the plane</option>
+            <option value="1">Hold band width on screen</option>
+            <option value="2">Finer as you zoom in</option>
+          </select>
+        </div>
+        <div class="row">
+          <span class="spacer"></span>
+          <span class="val" id="bandInfo" style="flex-basis:auto">&mdash;</span>
+        </div>
+        <p class="hint">Zooming in by 2 makes a band twice as wide on screen,
+           unchanged, or half as wide, in that order. The figure above is the
+           band width the current setting actually produces.</p>
+      </section>
+
+      <section>
+        <h2>Rotation</h2>
+        <div class="row">
+          <label>Offset</label>
+          <input type="range" id="phase" class="grow" min="0" max="1" step="0.001" value="0">
+          <input type="number" id="phaseNum" class="num" min="0" max="1" step="0.01" value="0">
+        </div>
+        <div class="row">
+          <label class="check"><input type="checkbox" id="cycle"><span>Rotate colours</span></label>
+          <span class="spacer"></span>
+          <label class="check"><input type="checkbox" id="cycleRev"><span>Reverse</span></label>
+        </div>
+        <div class="row" id="speedRow" style="display:none">
+          <label>Turns / second</label>
+          <input type="range" id="speed" class="grow" min="0.01" max="2" step="0.01" value="0.12">
+          <input type="number" id="speedNum" class="num" min="0.01" max="2" step="0.01" value="0.12">
+        </div>
+      </section>
+    </div>
+
+    <!-- --------------------------------------------------------- Marks -->
+    <div class="tab" data-tab="marks">
+      <section>
+        <h2>Numerical solutions</h2>
+        <div class="row">
+          <label class="check"><input type="checkbox" id="lines"><span>Mark numerical solutions</span></label>
+        </div>
+        <div id="lineOpts" style="display:none">
+          <div class="row">
+            <select id="setKind" class="grow" aria-label="Which numbers to mark"></select>
+            <input type="number" id="setN" class="num" min="0.01" max="24" step="1" value="2"
+                   aria-label="Set parameter" style="display:none">
+          </div>
+          <div class="row">
+            <label>Width</label>
+            <input type="range" id="lineW" class="grow" min="0.4" max="6" step="0.1" value="1.6">
+            <input type="number" id="lineWNum" class="num" min="0.4" max="6" step="0.1" value="1.6">
+          </div>
+          <div class="row" id="parityWrap">
+            <label class="check"><input type="checkbox" id="parity"><span>Split even / odd</span></label>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <h2>Continuation</h2>
+        <div class="row">
+          <select id="cont" aria-label="Continuation mode">
+            <option value="1" selected>Principal branch (real part)</option>
+            <option value="2">Odd reflection</option>
+            <option value="0">Off — leave holes</option>
+          </select>
+        </div>
+        <div class="row">
+          <label class="check"><input type="checkbox" id="repair" checked><span>Fill removable singularities</span></label>
+        </div>
+        <div class="row" id="markRow">
+          <label class="check"><input type="checkbox" id="markCont" checked><span>Hatch continued regions</span></label>
+        </div>
+      </section>
+    </div>
+
+    <!-- ------------------------------------------------------- Effects -->
+    <div class="tab" data-tab="fx">
+      <section>
+        <h2>Filter</h2>
+        <div class="row">
+          <label>Kernel</label>
+          <select id="postKernel" class="grow">
+            <option value="0" selected>None</option>
+            <option value="1">Sharpen</option>
+            <option value="2">Soften</option>
+            <option value="3">Edges</option>
+            <option value="4">Emboss</option>
+          </select>
+        </div>
+        <div class="row">
+          <label>Amount</label>
+          <input type="range" id="postKernelAmt" class="grow" min="0" max="1" step="0.01" value="0.5">
+          <input type="number" id="postKernelAmtNum" class="num" min="0" max="1" step="0.05" value="0.5">
+        </div>
+      </section>
+
+      <section>
+        <h2>Dither</h2>
+        <div class="row">
+          <label>Levels</label>
+          <input type="range" id="postLevels" class="grow" min="1" max="64" step="1" value="1">
+          <input type="number" id="postLevelsNum" class="num" min="1" max="64" step="1" value="1">
+        </div>
+        <div class="row">
+          <label>Pattern</label>
+          <select id="postDither" class="grow">
+            <option value="0">None</option>
+            <option value="1" selected>Ordered 4&times;4</option>
+            <option value="2">Ordered 8&times;8</option>
+            <option value="3">Noise</option>
+          </select>
+        </div>
+        <div class="row">
+          <label>Strength</label>
+          <input type="range" id="postDitherAmt" class="grow" min="0" max="4" step="0.05" value="1">
+          <input type="number" id="postDitherAmtNum" class="num" min="0" max="4" step="0.25" value="1">
+        </div>
+        <p class="hint">Levels of 1 leaves the colour untouched; lower it to
+           posterise, and the pattern hides the steps.</p>
+      </section>
+
+      <section>
+        <h2>Finish</h2>
+        <div class="row">
+          <label>Grain</label>
+          <input type="range" id="postGrain" class="grow" min="0" max="1" step="0.01" value="0">
+          <input type="number" id="postGrainNum" class="num" min="0" max="1" step="0.05" value="0">
+        </div>
+        <div class="row">
+          <label>Scanlines</label>
+          <input type="range" id="postScan" class="grow" min="0" max="1" step="0.01" value="0">
+          <input type="number" id="postScanNum" class="num" min="0" max="1" step="0.05" value="0">
+        </div>
+        <div class="row">
+          <label>Vignette</label>
+          <input type="range" id="postVignette" class="grow" min="0" max="1" step="0.01" value="0">
+          <input type="number" id="postVignetteNum" class="num" min="0" max="1" step="0.05" value="0">
+        </div>
+      </section>
+    </div>
+
+    <!-- -------------------------------------------------------- Export -->
+    <div class="tab" data-tab="out">
+      <section>
+        <h2>Output size</h2>
+        <div class="row">
+          <label>Aspect</label>
+          <select id="outRatio" class="grow"></select>
+        </div>
+        <div class="row">
+          <label>Preset</label>
+          <select id="outPreset" class="grow"></select>
         </div>
         <div class="row">
           <label>Width</label>
-          <input type="range" id="lineW" class="grow" min="0.4" max="6" step="0.1" value="1.6">
-          <input type="number" id="lineWNum" class="num" min="0.4" max="6" step="0.1" value="1.6">
+          <input type="range" id="outWr" class="grow" min="256" max="7680" step="16" value="1920">
+          <input type="number" id="outW" class="num" min="16" max="16384" step="16" value="1920">
         </div>
-        <div class="row" id="parityWrap">
-          <label class="check"><input type="checkbox" id="parity"><span>Split even / odd</span></label>
+        <div class="row">
+          <label>Height</label>
+          <input type="range" id="outHr" class="grow" min="256" max="4320" step="16" value="1080">
+          <input type="number" id="outH" class="num" min="16" max="16384" step="16" value="1080">
         </div>
-      </div>
-    </section>
-
-    <section>
-      <h2>Continuation</h2>
-      <div class="row">
-        <select id="cont" aria-label="Continuation mode">
-          <option value="1" selected>Principal branch (real part)</option>
-          <option value="2">Odd reflection</option>
-          <option value="0">Off — leave holes</option>
-        </select>
-      </div>
-      <div class="row">
-        <label class="check"><input type="checkbox" id="repair" checked><span>Fill removable singularities</span></label>
-      </div>
-      <div class="row" id="markRow">
-        <label class="check"><input type="checkbox" id="markCont" checked><span>Hatch continued regions</span></label>
-      </div>
-    </section>
-
-    <section>
-      <h2>Quality</h2>
-      <div class="row">
-        <label>Renderer</label>
-        <select id="backend" class="grow">
-          <option value="auto" selected>Auto</option>
-          <option value="gpu">GPU</option>
-          <option value="cpu">CPU</option>
-        </select>
-      </div>
-      <div class="row">
-        <label>Samples</label>
-        <select id="ss" class="grow">
-          <option value="1" selected>1 per pixel</option>
-          <option value="2">4 per pixel</option>
-          <option value="3">9 per pixel</option>
-        </select>
-      </div>
-      <div class="row">
-        <label class="check"><input type="checkbox" id="aa" checked><span>Band-limit fast regions</span></label>
-      </div>
-      <div class="row"><button id="save" class="grow">Save PNG</button></div>
-    </section>
-
-    <section>
-      <details>
-        <summary>Reference</summary>
-        <div class="ref">
-          <p>Colour is the fractional part of the value. A point <b>(x, y)</b> is painted
-             by <b>z</b>, so the classic views answer "which <b>z</b> solves
-             <b>z op y = x</b>?"</p>
-          <p><b>Variables</b> x, y, r (radius), a (angle), t (time)</p>
-          <p><b>Constants</b> pi, tau, e, phi</p>
-          <p><b>Operators</b> + &minus; * / % ^ and postfix ! &nbsp;·&nbsp;
-             juxtaposition multiplies: <b>2x</b>, <b>3(x+y)</b></p>
-          <p><b>Functions</b> sin cos tan sec csc cot asin acos atan atan2
-             sinh cosh tanh sech csch coth asinh acosh atanh
-             exp log ln log2 log10 logb sqrt cbrt root pow mod
-             abs sign floor ceil round trunc fract hypot min max clamp step
-             smoothstep mix gamma lgamma factorial ncr npr beta erf sinc
-             lambertw gcd lcm</p>
-          <p><b>Solutions</b> mark where z lands on a chosen set of numbers.
-             Hover a contour to thicken it and read its value.</p>
-          <p><b>Mouse</b> drag a box to zoom · shift-drag or middle-drag to pan ·
-             wheel zooms at the pointer · double-click zooms in</p>
-          <p><b>Keys</b> + &minus; zoom · arrows pan · 0 reset · c rotate · l contours · g grid</p>
+        <div class="row">
+          <label class="check"><input type="checkbox" id="outLock" checked><span>Lock aspect</span></label>
+          <span class="spacer"></span>
+          <span class="val" id="outInfo" style="flex-basis:auto">&mdash;</span>
         </div>
-      </details>
-    </section>
+        <p class="hint">The horizontal span of the view is preserved, so a wider
+           aspect shows more above and below.</p>
+      </section>
+
+      <section>
+        <h2>Image</h2>
+        <div class="row">
+          <label class="check"><input type="checkbox" id="outGuides"><span>Include grid and axes</span></label>
+        </div>
+        <div class="row"><button id="save" class="grow">Save PNG</button></div>
+        <p class="hint">PNG is lossless already. Large sizes are rendered in
+           tiles, so the output is not limited to what fits on screen.</p>
+      </section>
+
+      <section>
+        <h2>Video</h2>
+        <div class="row">
+          <label>Format</label>
+          <select id="vidFormat" class="grow">
+            <option value="apng" selected>APNG &mdash; lossless, loops</option>
+            <option value="zip">PNG frames &mdash; lossless, .zip</option>
+            <option value="mp4">MP4 &mdash; H.264, compressed</option>
+            <option value="webm">WebM &mdash; VP9, compressed</option>
+          </select>
+        </div>
+        <div class="row" id="vidRateRow" style="display:none">
+          <label>Bitrate</label>
+          <input type="range" id="vidRate" class="grow" min="2" max="400" step="2" value="120">
+          <input type="number" id="vidRateNum" class="num" min="2" max="400" step="10" value="120">
+        </div>
+        <div class="row">
+          <label>Mode</label>
+          <select id="vidMode" class="grow">
+            <option value="cycle" selected>One colour cycle (seamless loop)</option>
+            <option value="zoom">Zoom, timed to one cycle</option>
+          </select>
+        </div>
+        <div class="row">
+          <label>Seconds</label>
+          <input type="range" id="vidSecs" class="grow" min="1" max="30" step="0.5" value="6">
+          <input type="number" id="vidSecsNum" class="num" min="1" max="30" step="0.5" value="6">
+        </div>
+        <div class="row">
+          <label>Frames / s</label>
+          <select id="vidFps" class="grow">
+            <option value="12">12</option>
+            <option value="24">24</option>
+            <option value="30" selected>30</option>
+            <option value="60">60</option>
+          </select>
+        </div>
+        <div class="row" id="vidZoomRow" style="display:none">
+          <label>Zoom by</label>
+          <input type="range" id="vidZoom" class="grow" min="1.5" max="1000" step="0.5" value="16">
+          <input type="number" id="vidZoomNum" class="num" min="1.5" max="1000" step="1" value="16">
+        </div>
+        <div class="row">
+          <label class="check"><input type="checkbox" id="vidUseSize" checked><span>Use the output size above</span></label>
+        </div>
+        <div class="row">
+          <button id="record" class="grow">Record</button>
+          <button id="vidStop" style="display:none">Stop</button>
+        </div>
+        <div id="vidStatus" class="hint"></div>
+        <p class="hint" id="vidWarn"></p>
+        <p class="hint">MP4 and WebM are both lossy, so fine banding softens at
+           any bitrate. Use APNG or PNG frames when the detail matters.</p>
+      </section>
+
+      <section>
+        <h2>Settings</h2>
+        <div class="btns">
+          <button id="setSave">Save file</button>
+          <button id="setLoad">Load file</button>
+        </div>
+        <input type="file" id="setFile" accept="application/json,.json" style="display:none">
+        <p class="hint">Includes the function library, the view, every control
+           and your formula history.</p>
+      </section>
+
+      <section>
+        <details>
+          <summary>Reference</summary>
+          <div class="ref">
+            <p>Colour is the fractional part of the value. A point <b>(x, y)</b> is
+               painted by <b>z</b>, so the classic views answer "which <b>z</b>
+               solves <b>z op y = x</b>?"</p>
+            <p><b>Variables</b> x, y, r (radius), a (angle), t (time). Any other
+               bare name becomes a free variable with its own slider.</p>
+            <p><b>Constants</b> pi, tau, e, phi</p>
+            <p><b>Operators</b> + &minus; * / % ^ and postfix ! &nbsp;·&nbsp;
+               juxtaposition multiplies: <b>2x</b>, <b>3(x+y)</b></p>
+            <p><b>Sequences</b> sum(k, 1, 8, k^x) and prod(k, 1, 4, x+k)</p>
+            <p><b>Calculus</b> deriv(u, x, sin(u)) · deriv2(u, x, u^3) ·
+               integ(u, 0, x, u^2). Numerical, so the index is a bound name
+               like the one a sum takes.</p>
+            <p><b>Zeta</b> zeta(s) and eta(s) are real on the real line. To see
+               the critical strip, read the point as s = x + iy and draw a real
+               part of it: zetare, zetaim, zetaabs or zetaarg.</p>
+            <p><b>Functions</b> sin cos tan sec csc cot asin acos atan atan2
+               sinh cosh tanh sech csch coth asinh acosh atanh
+               exp log ln log2 log10 logb sqrt cbrt root pow mod
+               abs sign floor ceil round trunc fract hypot min max clamp step
+               smoothstep mix gamma lgamma factorial ncr npr beta erf sinc
+               lambertw gcd lcm if lt gt zeta eta zetare zetaim zetaabs
+               zetaarg</p>
+            <p><b>Mouse</b> drag a box to zoom · shift-drag or middle-drag to pan ·
+               wheel zooms at the pointer · flick the wheel for continuous zoom</p>
+            <p><b>Keys</b> + &minus; zoom · arrows pan · 0 reset · c rotate ·
+               l marks · g grid · esc stop</p>
+          </div>
+        </details>
+      </section>
+    </div>
 
   </div>
 
@@ -578,6 +1008,7 @@ details[open] summary::before { content: "\2212 "; }
       <div id="readout"></div>
       <div id="note"></div>
       <div id="hitLabel"></div>
+      <div id="scaleNoteBar"></div>
     </div>
     <div id="railwrap">
       <span class="railcap" id="railTop">1.00</span>
@@ -627,6 +1058,71 @@ details[open] summary::before { content: "\2212 "; }
   function lzLogGamma(x) {                 // x >= 0.5
     var xx = x - 1, t = xx + 7.5;
     return 0.9189385332046727 + (xx + 0.5) * Math.log(t) - t + Math.log(lzSum(xx));
+  }
+
+  /* ------------------------------------------------------------ zeta */
+  /* Euler-Maclaurin where it is well conditioned, the functional equation to
+     the left of it. Every step is a pair of reals, so nothing here needs a
+     complex type: a point (x, y) is read as s = x + iy and the caller picks
+     which real part of the answer to draw. */
+  var ZB = [0.08333333333333333, -0.001388888888888889, 3.306878306878307e-5,
+    -8.267195767195767e-7, 2.087675698786810e-8, -5.284190138687493e-10];
+
+  function zcmul(a, b) { return [a[0] * b[0] - a[1] * b[1], a[0] * b[1] + a[1] * b[0]]; }
+  function zcdiv(a, b) {
+    var d = b[0] * b[0] + b[1] * b[1];
+    if (d === 0) return [VBAD, 0];
+    return [(a[0] * b[0] + a[1] * b[1]) / d, (a[1] * b[0] - a[0] * b[1]) / d];
+  }
+  function zcexp(z) { var m = Math.exp(z[0]); return [m * Math.cos(z[1]), m * Math.sin(z[1])]; }
+  function zclog(z) { return [0.5 * Math.log(z[0] * z[0] + z[1] * z[1]), Math.atan2(z[1], z[0])]; }
+  function zrpow(base, s) {
+    var L = Math.log(base), m = Math.exp(s[0] * L);
+    return [m * Math.cos(s[1] * L), m * Math.sin(s[1] * L)];
+  }
+  function zcgamma(z) {                    // Lanczos; only used for Re(z) >= 3.5
+    var zz = [z[0] - 1, z[1]], a = [LZ[0], 0];
+    for (var i = 1; i < 9; i++) {
+      var q = zcdiv([LZ[i], 0], [zz[0] + i, zz[1]]);
+      a[0] += q[0]; a[1] += q[1];
+    }
+    var tt = [zz[0] + 7.5, zz[1]];
+    var p = zcexp(zcmul([zz[0] + 0.5, zz[1]], zclog(tt)));
+    return zcmul(zcmul([2.5066282746310002, 0], p), zcmul(zcexp([-tt[0], -tt[1]]), a));
+  }
+  function zEM(s) {                        // Euler-Maclaurin
+    var NT = Math.min(64, Math.max(14, Math.ceil(Math.abs(s[1])) + 12));
+    var acc = [0, 0], n, t;
+    for (n = 1; n < NT; n++) {
+      t = zrpow(n, [-s[0], -s[1]]);
+      acc[0] += t[0]; acc[1] += t[1];
+    }
+    var fN = NT, Ns = zrpow(fN, [-s[0], -s[1]]);
+    acc[0] += 0.5 * Ns[0]; acc[1] += 0.5 * Ns[1];
+    var q = zcdiv(zcmul(Ns, [fN, 0]), [s[0] - 1, s[1]]);
+    acc[0] += q[0]; acc[1] += q[1];
+    var P = [s[0], s[1]], Np = fN;
+    for (var k = 0; k < 6; k++) {
+      var term = zcmul(Ns, P);
+      acc[0] += ZB[k] * term[0] / Np;
+      acc[1] += ZB[k] * term[1] / Np;
+      var j = 2 * k + 1;
+      P = zcmul(P, [s[0] + j, s[1]]);
+      P = zcmul(P, [s[0] + j + 1, s[1]]);
+      Np *= fN * fN;
+    }
+    return acc;
+  }
+  function zetaC(sr, si) {
+    if (Math.abs(sr - 1) < 1e-9 && Math.abs(si) < 1e-9) { RT.pole = 1; return [VBAD, 0]; }
+    if (sr >= -2.5) return zEM([sr, si]);
+    /* zeta(s) = 2^s pi^(s-1) sin(pi s/2) gamma(1-s) zeta(1-s) */
+    var s = [sr, si], o = [1 - sr, -si];
+    var r = zcmul(zrpow(2, s), zrpow(Math.PI, [s[0] - 1, s[1]]));
+    r = zcmul(r, [Math.sin(Math.PI * s[0] / 2) * Math.cosh(Math.PI * s[1] / 2),
+      Math.cos(Math.PI * s[0] / 2) * Math.sinh(Math.PI * s[1] / 2)]);
+    r = zcmul(r, zcgamma(o));
+    return zcmul(r, zEM(o));
   }
 
   /* ------------------------------------------------- runtime math helpers */
@@ -824,6 +1320,20 @@ details[open] summary::before { content: "\2212 "; }
       if (g < 0.5) { RT.pole = 1; return VBAD; }
       return Math.abs(Math.round(a) * Math.round(b)) / g;
     },
+    zeta: function (x) {
+      var r = zetaC(x, 0);
+      if (!(Math.abs(r[0]) < BIG)) { RT.pole = 1; return VBAD; }
+      return r[0];
+    },
+    zetare: function (a, b) { return zetaC(a, b)[0]; },
+    zetaim: function (a, b) { return zetaC(a, b)[1]; },
+    zetaabs: function (a, b) { var r = zetaC(a, b); return Math.sqrt(r[0] * r[0] + r[1] * r[1]); },
+    zetaarg: function (a, b) { var r = zetaC(a, b); return Math.atan2(r[1], r[0]); },
+    eta: function (x) {                    // Dirichlet eta, finite at s = 1
+      var r = zetaC(x, 0);
+      if (Math.abs(x - 1) < 1e-9) { RT.pole = 0; return Math.LN2; }
+      return (1 - Math.pow(2, 1 - x)) * r[0];
+    },
     sinh: Math.sinh, cosh: Math.cosh, tanh: Math.tanh, asinh: Math.asinh,
     sin: Math.sin, cos: Math.cos, atan: Math.atan, exp: Math.exp,
     abs: Math.abs, floor: Math.floor, ceil: Math.ceil, round: Math.round,
@@ -893,17 +1403,34 @@ details[open] summary::before { content: "\2212 "; }
     abs: 1, sign: 1, floor: 1, ceil: 1, round: 1, trunc: 1, fract: 1,
     gamma: 1, lgamma: 1, factorial: 1, erf: 1, sinc: 1,
     sec: 1, csc: 1, cot: 1, sech: 1, csch: 1, coth: 1, lambertw: 1,
+    zeta: 1, eta: 1,
+    zetare: 2, zetaim: 2, zetaabs: 2, zetaarg: 2,
     atan2: 2, pow: 2, mod: 2, min: 2, max: 2, hypot: 2, logb: 2, step: 2, root: 2,
     ncr: 2, npr: 2, beta: 2, gcd: 2, lcm: 2,
-    clamp: 3, smoothstep: 3, mix: 3
+    lt: 2, gt: 2,
+    clamp: 3, smoothstep: 3, mix: 3, iff: 3
   };
+  /* sum/prod bind a variable, so they are parsed as special forms */
+  /* Bound-variable forms. arity 4 is (var, lo, hi, body); arity 3 is
+     (var, at, body). */
+  var SEQ = {
+    sum: 'sum', prod: 'prod', product: 'prod', integ: 'integ', integral: 'integ',
+    deriv: 'deriv', derivative: 'deriv', deriv2: 'deriv2'
+  };
+  var SEQ_ARITY = { sum: 4, prod: 4, integ: 4, deriv: 3, deriv2: 3 };
+  var SIMPSON_N = 64;            // even; 65 body evaluations per integral
+  var DERIV_H = 5e-3;            // 5-point stencil step, scaled by |at|
+  var SEQ_MAX = 512;
   var FN_ALIAS = {
     ln: 'log', frac: 'fract', lerp: 'mix', nroot: 'root', nthroot: 'root',
     arcsin: 'asin', arccos: 'acos', arctan: 'atan',
     arcsinh: 'asinh', arccosh: 'acosh', arctanh: 'atanh',
     sgn: 'sign', fact: 'factorial', lngamma: 'lgamma', loggamma: 'lgamma',
     productlog: 'lambertw', nck: 'ncr', binomial: 'ncr', choose: 'ncr',
-    permutations: 'npr', combinations: 'ncr'
+    permutations: 'npr', combinations: 'ncr',
+    'if': 'iff', select: 'iff', less: 'lt', greater: 'gt',
+    riemannzeta: 'zeta', zetamod: 'zetaabs', zetaphase: 'zetaarg',
+    dirichleteta: 'eta'
   };
   var CONSTS = { pi: Math.PI, tau: TAU, e: Math.E, phi: 1.618033988749895 };
   var VARS = { x: 1, y: 1, t: 1, r: 1, a: 1 };
@@ -914,7 +1441,7 @@ details[open] summary::before { content: "\2212 "; }
 
   function parse(input) {
     var src = normalize(input);
-    var toks = tokenize(src), p = 0;
+    var toks = tokenize(src), p = 0, bound = [];
 
     function peek() { return toks[p]; }
     function next() { return toks[p++]; }
@@ -938,10 +1465,32 @@ details[open] summary::before { content: "\2212 "; }
         return tk.v === '-' ? { k: 'neg', a: a } : a;
       }
       if (tk.t === 'id') {
-        var name = tk.v.toLowerCase();
+        var raw = tk.v;
+        var name = raw.toLowerCase();
         if (FN_ALIAS[name]) name = FN_ALIAS[name];
+
         if (peek().t === '(') {
-          if (!FUNCS[name]) throw ParseError('Unknown function "' + tk.v + '"', tk.pos);
+          /* sum(k, lo, hi, body) binds k over the body, so it cannot be
+             parsed as an ordinary call */
+          if (SEQ[name]) {
+            next();
+            var vt = next();
+            if (vt.t !== 'id') throw ParseError(name + '() needs an index name first', vt.pos);
+            var vname = vt.v.toLowerCase();
+            if (VARS.hasOwnProperty(vname) || CONSTS.hasOwnProperty(vname)) {
+              throw ParseError('"' + vt.v + '" is already taken; pick another index name', vt.pos);
+            }
+            expect(',', '","');
+            var op = SEQ[name];
+            var lo = expr(0), hi = null;
+            expect(',', '","');
+            if (SEQ_ARITY[op] === 4) { hi = expr(0); expect(',', '","'); }
+            bound.push(vname);
+            var body = expr(0);
+            bound.pop();
+            expect(')', '")"');
+            return { k: 'seq', op: op, name: vname, lo: lo, hi: hi, body: body };
+          }
           next();
           var args = [];
           if (peek().t !== ')') {
@@ -949,16 +1498,24 @@ details[open] summary::before { content: "\2212 "; }
             while (peek().t === ',') { next(); args.push(expr(0)); }
           }
           expect(')', '")"');
-          if (args.length !== FUNCS[name]) {
-            throw ParseError(name + '() takes ' + FUNCS[name] + ' argument' +
-              (FUNCS[name] > 1 ? 's' : '') + ', got ' + args.length, tk.pos);
+          if (FUNCS[name]) {
+            if (args.length !== FUNCS[name]) {
+              throw ParseError(name + '() takes ' + FUNCS[name] + ' argument' +
+                (FUNCS[name] > 1 ? 's' : '') + ', got ' + args.length, tk.pos);
+            }
+            return { k: 'call', name: name, args: args };
           }
-          return { k: 'call', name: name, args: args };
+          /* anything else is a reference to a user-defined function; whether
+             it exists is settled at link time, where the definitions live */
+          return { k: 'user', name: name, args: args, pos: tk.pos };
         }
+
         if (CONSTS.hasOwnProperty(name)) return { k: 'num', v: CONSTS[name] };
         if (VARS.hasOwnProperty(name)) return { k: 'var', name: name };
-        if (FUNCS[name]) throw ParseError(name + '() needs parentheses', tk.pos);
-        throw ParseError('Unknown name "' + tk.v + '"', tk.pos);
+        if (bound.indexOf(name) >= 0) return { k: 'var', name: name, bound: true };
+        if (FUNCS[name] || SEQ[name]) throw ParseError(name + '() needs parentheses', tk.pos);
+        /* an unclaimed name becomes a free parameter with its own slider */
+        return { k: 'param', name: name };
       }
       throw ParseError('Unexpected ' + (tk.t === 'eof' ? 'end of expression' : 'token'), tk.pos);
     }
@@ -999,6 +1556,111 @@ details[open] summary::before { content: "\2212 "; }
     return ast;
   }
 
+  /* ---------------------------------------------------------------- linker */
+  /* Parses "name(a, b) = body" into a definition. */
+  function parseDefinition(text) {
+    var src = normalize(String(text));
+    var eq = src.indexOf('=');
+    if (eq < 0) throw ParseError('A definition needs an "=", e.g. f(u,v) = u*v', 0);
+    var head = src.slice(0, eq).trim(), bodySrc = src.slice(eq + 1);
+    var m = /^([A-Za-z_][A-Za-z0-9_]*)\s*(\(([^)]*)\))?$/.exec(head);
+    if (!m) throw ParseError('The left of "=" should look like f(u, v)', 0);
+    var name = m[1].toLowerCase();
+    if (FUNCS[name] || SEQ[name] || FN_ALIAS[name] || VARS[name] || CONSTS[name]) {
+      throw ParseError('"' + m[1] + '" is a built-in name; choose another', 0);
+    }
+    var params = [];
+    if (m[3] !== undefined && m[3].trim() !== '') {
+      params = m[3].split(',').map(function (p2) { return p2.trim().toLowerCase(); });
+      for (var i = 0; i < params.length; i++) {
+        if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(params[i])) {
+          throw ParseError('"' + params[i] + '" is not a valid parameter name', 0);
+        }
+      }
+    }
+    if (!bodySrc.trim()) throw ParseError('The definition has no body', eq + 1);
+    return { name: name, params: params, body: parse(bodySrc), src: String(text) };
+  }
+
+  function cloneAst(n) { return JSON.parse(JSON.stringify(n)); }
+
+  /* Replaces free occurrences of the given names, honouring shadowing by a
+     sequence index. */
+  function substitute(node, map) {
+    switch (node.k) {
+      case 'num': return node;
+      case 'var': return (node.bound && map[node.name]) ? map[node.name] : node;
+      case 'param': return map[node.name] ? map[node.name] : node;
+      case 'neg': return { k: 'neg', a: substitute(node.a, map) };
+      case 'bin': return { k: 'bin', op: node.op, l: substitute(node.l, map), r: substitute(node.r, map) };
+      case 'call': return { k: 'call', name: node.name, args: node.args.map(function (x) { return substitute(x, map); }) };
+      case 'user': return { k: 'user', name: node.name, pos: node.pos, args: node.args.map(function (x) { return substitute(x, map); }) };
+      case 'seq': {
+        var inner = map;
+        if (map[node.name]) {                 // the index shadows the substitution
+          inner = {};
+          for (var key in map) if (key !== node.name) inner[key] = map[key];
+        }
+        return {
+          k: 'seq', op: node.op, name: node.name,
+          lo: substitute(node.lo, map), hi: node.hi ? substitute(node.hi, map) : null,
+          body: substitute(node.body, inner)
+        };
+      }
+    }
+    return node;
+  }
+
+  var LINK_NODE_CAP = 40000;
+
+  /* Flattens every user-function reference into one expression tree. GLSL has
+     no recursion, so a function that reaches itself is unrolled a fixed number
+     of times and the innermost call becomes the seed value. */
+  function link(ast, defs, opts) {
+    opts = opts || {};
+    var depth = opts.depth === undefined ? 4 : Math.max(0, Math.min(24, opts.depth));
+    var seed = opts.seed === undefined ? 0 : opts.seed;
+    var byName = {};
+    (defs || []).forEach(function (d) { byName[d.name] = d; });
+    var count = 0, recursed = false;
+
+    function go(node, stack) {
+      if (++count > LINK_NODE_CAP) {
+        throw ParseError('This composition expands too far to draw; simplify it', 0);
+      }
+      switch (node.k) {
+        case 'num': case 'var': case 'param': return node;
+        case 'neg': return { k: 'neg', a: go(node.a, stack) };
+        case 'bin': return { k: 'bin', op: node.op, l: go(node.l, stack), r: go(node.r, stack) };
+        case 'call': return { k: 'call', name: node.name, args: node.args.map(function (x) { return go(x, stack); }) };
+        case 'seq': return {
+          k: 'seq', op: node.op, name: node.name,
+          lo: go(node.lo, stack), hi: node.hi ? go(node.hi, stack) : null,
+          body: go(node.body, stack)
+        };
+        case 'user': {
+          var d = byName[node.name];
+          if (!d) throw ParseError('No function named "' + node.name + '"', node.pos || 0);
+          if (d.params.length !== node.args.length) {
+            throw ParseError(node.name + '() takes ' + d.params.length +
+              ' argument' + (d.params.length === 1 ? '' : 's') +
+              ', got ' + node.args.length, node.pos || 0);
+          }
+          var used = 0;
+          for (var i = 0; i < stack.length; i++) if (stack[i] === node.name) used++;
+          if (used >= depth) { recursed = true; return { k: 'num', v: seed }; }
+          if (used > 0) recursed = true;
+          var map = {};
+          for (var j = 0; j < d.params.length; j++) map[d.params[j]] = go(node.args[j], stack);
+          return go(substitute(cloneAst(d.body), map), stack.concat(node.name));
+        }
+      }
+      return node;
+    }
+    var out = go(ast, []);
+    return { ast: out, recursed: recursed, nodes: count };
+  }
+
   /* -------------------------------------------------------------- analysis */
   function analyze(ast) {
     var info = { usesTime: false, usesR: false, usesA: false, nodes: 0 };
@@ -1010,7 +1672,11 @@ details[open] summary::before { content: "\2212 "; }
         if (n.name === 'a') info.usesA = true;
       } else if (n.k === 'neg') walk(n.a);
       else if (n.k === 'bin') { walk(n.l); walk(n.r); }
-      else if (n.k === 'call') for (var i = 0; i < n.args.length; i++) walk(n.args[i]);
+      else if (n.k === 'call' || n.k === 'user') {
+        for (var i = 0; i < n.args.length; i++) walk(n.args[i]);
+      } else if (n.k === 'seq') {
+        walk(n.lo); if (n.hi) walk(n.hi); walk(n.body);
+      }
     })(ast);
     return info;
   }
@@ -1027,6 +1693,37 @@ details[open] summary::before { content: "\2212 "; }
   function jsExpr(n) {
     switch (n.k) {
       case 'num': return numLit(n.v);
+      case 'param': return 'P.' + n.name;
+      case 'seq': {
+        /* inline loops, so a sum or an integral stays usable anywhere an
+           expression is */
+        var v = n.name;
+        if (n.op === 'sum' || n.op === 'prod') {
+          var acc = n.op === 'sum' ? '0' : '1';
+          var opr = n.op === 'sum' ? '+=' : '*=';
+          return '(function(){var _lo=' + jsExpr(n.lo) + ',_hi=' + jsExpr(n.hi) +
+            ',_a=' + acc + ';for(var _i=0;_i<' + SEQ_MAX + ';_i++){var ' + v +
+            '=_lo+_i;if(' + v + '>_hi+1e-9)break;_a' + opr + '(' + jsExpr(n.body) +
+            ');}return _a;})()';
+        }
+        if (n.op === 'integ') {
+          /* composite Simpson over a fixed number of panels */
+          return '(function(){var _lo=' + jsExpr(n.lo) + ',_hi=' + jsExpr(n.hi) +
+            ',_n=' + SIMPSON_N + ',_h=(_hi-_lo)/_n,_a=0,' + v + ';' +
+            'for(var _i=0;_i<=_n;_i++){' + v + '=_lo+_i*_h;' +
+            'var _w=(_i===0||_i===_n)?1:((_i&1)?4:2);' +
+            '_a+=_w*(' + jsExpr(n.body) + ');}return _a*_h/3;})()';
+        }
+        /* five-point stencil: fourth-order accurate, so a step large enough
+           to stay clear of float32 cancellation still gives a clean slope */
+        var order2 = n.op === 'deriv2';
+        return '(function(){var _c=' + jsExpr(n.lo) +
+          ',_h=' + DERIV_H + '*(Math.abs(_c)>1?Math.abs(_c):1),' + v + ',_f=[];' +
+          'for(var _i=-2;_i<=2;_i++){' + v + '=_c+_i*_h;_f.push(' + jsExpr(n.body) + ');}' +
+          (order2
+            ? 'return (-_f[0]+16*_f[1]-30*_f[2]+16*_f[3]-_f[4])/(12*_h*_h);})()'
+            : 'return (_f[0]-8*_f[1]+8*_f[3]-_f[4])/(12*_h);})()');
+      }
       case 'var': return n.name === 't' ? 't' : n.name;
       case 'neg': return '(-' + jsExpr(n.a) + ')';
       case 'bin': {
@@ -1039,6 +1736,9 @@ details[open] summary::before { content: "\2212 "; }
       case 'call': {
         var A = n.args.map(jsExpr);
         if (n.name === 'root') return 'H.pow(' + A[0] + ',H.div(1,' + A[1] + '))';
+        if (n.name === 'iff') return '((' + A[0] + ')>0?(' + A[1] + '):(' + A[2] + '))';
+        if (n.name === 'lt') return '((' + A[0] + ')<(' + A[1] + ')?1:0)';
+        if (n.name === 'gt') return '((' + A[0] + ')>(' + A[1] + ')?1:0)';
         if (JS_DIRECT[n.name]) return JS_DIRECT[n.name] + '(' + A.join(',') + ')';
         return 'H.' + n.name + '(' + A.join(',') + ')';
       }
@@ -1052,43 +1752,115 @@ details[open] summary::before { content: "\2212 "; }
     return v < 0 ? '(' + s + ')' : s;
   }
 
-  /* Closure-tree fallback for environments where new Function is blocked. */
+  /* Closure-tree fallback for environments where new Function is blocked.
+     Every closure takes the parameter scope as a sixth argument so free
+     variables and sequence indices resolve the same way they do in the
+     compiled path. */
   function closureTree(n) {
     switch (n.k) {
       case 'num': { var v = n.v; return function () { return v; }; }
+      case 'param': {
+        var pn = n.name;
+        return function (x, y, t, r, a, P) { return P ? P[pn] : undefined; };
+      }
+      case 'seq': {
+        var LO = closureTree(n.lo), B = closureTree(n.body);
+        var HI = n.hi ? closureTree(n.hi) : null;
+        var op = n.op, bn = n.name;
+        return function (x, y, t, r, a, P) {
+          var scope = P ? Object.create(P) : {};
+          var lo = LO(x, y, t, r, a, P);
+          var i, acc;
+          if (op === 'sum' || op === 'prod') {
+            var hi = HI(x, y, t, r, a, P);
+            acc = op === 'sum' ? 0 : 1;
+            for (i = 0; i < SEQ_MAX; i++) {
+              var kv = lo + i;
+              if (kv > hi + 1e-9) break;
+              scope[bn] = kv;
+              var term = B(x, y, t, r, a, scope);
+              if (op === 'sum') acc += term; else acc *= term;
+            }
+            return acc;
+          }
+          if (op === 'integ') {
+            var top = HI(x, y, t, r, a, P);
+            var h = (top - lo) / SIMPSON_N;
+            acc = 0;
+            for (i = 0; i <= SIMPSON_N; i++) {
+              scope[bn] = lo + i * h;
+              var w = (i === 0 || i === SIMPSON_N) ? 1 : ((i & 1) ? 4 : 2);
+              acc += w * B(x, y, t, r, a, scope);
+            }
+            return acc * h / 3;
+          }
+          var dh = DERIV_H * (Math.abs(lo) > 1 ? Math.abs(lo) : 1);
+          var f = [];
+          for (i = -2; i <= 2; i++) {
+            scope[bn] = lo + i * dh;
+            f.push(B(x, y, t, r, a, scope));
+          }
+          if (op === 'deriv2') {
+            return (-f[0] + 16 * f[1] - 30 * f[2] + 16 * f[3] - f[4]) / (12 * dh * dh);
+          }
+          return (f[0] - 8 * f[1] + 8 * f[3] - f[4]) / (12 * dh);
+        };
+      }
       case 'var':
         switch (n.name) {
           case 'x': return function (x) { return x; };
           case 'y': return function (x, y) { return y; };
           case 't': return function (x, y, t) { return t; };
           case 'r': return function (x, y, t, r) { return r; };
-          default: return function (x, y, t, r, a) { return a; };
+          case 'a': return function (x, y, t, r, a) { return a; };
+          default: {
+            /* a sequence index, held in the scope object */
+            var vn = n.name;
+            return function (x, y, t, r, a, P) { return P ? P[vn] : undefined; };
+          }
         }
       case 'neg': {
         var f = closureTree(n.a);
-        return function (x, y, t, r, a) { return -f(x, y, t, r, a); };
+        return function (x, y, t, r, a, P) { return -f(x, y, t, r, a, P); };
       }
       case 'bin': {
         var L = closureTree(n.l), R = closureTree(n.r);
         switch (n.op) {
-          case '+': return function (x, y, t, r, a) { return L(x, y, t, r, a) + R(x, y, t, r, a); };
-          case '-': return function (x, y, t, r, a) { return L(x, y, t, r, a) - R(x, y, t, r, a); };
-          case '*': return function (x, y, t, r, a) { return L(x, y, t, r, a) * R(x, y, t, r, a); };
-          case '/': return function (x, y, t, r, a) { return H.div(L(x, y, t, r, a), R(x, y, t, r, a)); };
-          case '%': return function (x, y, t, r, a) { return H.mod(L(x, y, t, r, a), R(x, y, t, r, a)); };
-          default: return function (x, y, t, r, a) { return H.pow(L(x, y, t, r, a), R(x, y, t, r, a)); };
+          case '+': return function (x, y, t, r, a, P) { return L(x, y, t, r, a, P) + R(x, y, t, r, a, P); };
+          case '-': return function (x, y, t, r, a, P) { return L(x, y, t, r, a, P) - R(x, y, t, r, a, P); };
+          case '*': return function (x, y, t, r, a, P) { return L(x, y, t, r, a, P) * R(x, y, t, r, a, P); };
+          case '/': return function (x, y, t, r, a, P) { return H.div(L(x, y, t, r, a, P), R(x, y, t, r, a, P)); };
+          case '%': return function (x, y, t, r, a, P) { return H.mod(L(x, y, t, r, a, P), R(x, y, t, r, a, P)); };
+          default: return function (x, y, t, r, a, P) { return H.pow(L(x, y, t, r, a, P), R(x, y, t, r, a, P)); };
         }
       }
       case 'call': {
         var A = n.args.map(closureTree), name = n.name;
         if (name === 'root') {
-          return function (x, y, t, r, a) { return H.pow(A[0](x, y, t, r, a), H.div(1, A[1](x, y, t, r, a))); };
+          return function (x, y, t, r, a, P) {
+            return H.pow(A[0](x, y, t, r, a, P), H.div(1, A[1](x, y, t, r, a, P)));
+          };
+        }
+        if (name === 'iff') {
+          return function (x, y, t, r, a, P) {
+            return A[0](x, y, t, r, a, P) > 0 ? A[1](x, y, t, r, a, P) : A[2](x, y, t, r, a, P);
+          };
+        }
+        if (name === 'lt') {
+          return function (x, y, t, r, a, P) { return A[0](x, y, t, r, a, P) < A[1](x, y, t, r, a, P) ? 1 : 0; };
+        }
+        if (name === 'gt') {
+          return function (x, y, t, r, a, P) { return A[0](x, y, t, r, a, P) > A[1](x, y, t, r, a, P) ? 1 : 0; };
         }
         var fn = H[name];
-        if (A.length === 1) return function (x, y, t, r, a) { return fn(A[0](x, y, t, r, a)); };
-        if (A.length === 2) return function (x, y, t, r, a) { return fn(A[0](x, y, t, r, a), A[1](x, y, t, r, a)); };
-        return function (x, y, t, r, a) { return fn(A[0](x, y, t, r, a), A[1](x, y, t, r, a), A[2](x, y, t, r, a)); };
+        if (A.length === 1) return function (x, y, t, r, a, P) { return fn(A[0](x, y, t, r, a, P)); };
+        if (A.length === 2) return function (x, y, t, r, a, P) { return fn(A[0](x, y, t, r, a, P), A[1](x, y, t, r, a, P)); };
+        return function (x, y, t, r, a, P) {
+          return fn(A[0](x, y, t, r, a, P), A[1](x, y, t, r, a, P), A[2](x, y, t, r, a, P));
+        };
       }
+      case 'user':
+        throw new Error('unresolved reference to ' + n.name + '(); link before compiling');
     }
     throw new Error('bad node');
   }
@@ -1097,8 +1869,9 @@ details[open] summary::before { content: "\2212 "; }
     var body = 'return ' + jsExpr(ast) + ';';
     try {
       /* eslint-disable no-new-func */
-      var f = new Function('x', 'y', 't', 'r', 'a', 'H', body);
-      return function (x, y, t, r, a) { return f(x, y, t, r, a, H); };
+      var f = new Function('x', 'y', 't', 'r', 'a', 'H', 'P', body);
+      var noP = {};
+      return function (x, y, t, r, a, P) { return f(x, y, t, r, a, H, P || noP); };
     } catch (err) {
       return closureTree(ast);
     }
@@ -1119,7 +1892,9 @@ details[open] summary::before { content: "\2212 "; }
     gamma: 'c_gamma', lgamma: 'c_lgamma', factorial: 'c_factorial',
     ncr: 'c_ncr', npr: 'c_npr', beta: 'c_beta', erf: 'c_erf', sinc: 'c_sinc',
     sec: 'c_sec', csc: 'c_csc', cot: 'c_cot', sech: 'c_sech', csch: 'c_csch',
-    coth: 'c_coth', lambertw: 'c_lambertw', gcd: 'c_gcd', lcm: 'c_lcm'
+    coth: 'c_coth', lambertw: 'c_lambertw', gcd: 'c_gcd', lcm: 'c_lcm',
+    zeta: 'c_zeta', eta: 'c_eta', zetare: 'c_zetare', zetaim: 'c_zetaim',
+    zetaabs: 'c_zetaabs', zetaarg: 'c_zetaarg'
   };
 
   function glslNum(v) {
@@ -1135,34 +1910,115 @@ details[open] summary::before { content: "\2212 "; }
     return v < 0 ? '(' + s + ')' : s;
   }
 
+  /* GLSL has no statement-expressions, so a sum has to become a real loop
+     hoisted ahead of the expression that uses it. The emitter therefore
+     returns a block of statements alongside the final expression. */
   function emitGLSL(ast, used) {
     used = used || {};
+    var ctx = { n: 0, params: {} };
     function mark(f) { used[f] = true; return f; }
-    function go(n) {
+    function tmp() { return '_v' + (ctx.n++); }
+
+    function go(n, out) {
       switch (n.k) {
         case 'num': return glslNum(n.v);
+        case 'param': ctx.params[n.name] = true; return 'p_' + n.name;
         case 'var': return n.name === 't' ? 'uTime' : n.name;
-        case 'neg': return '(-' + go(n.a) + ')';
+        case 'neg': return '(-' + go(n.a, out) + ')';
         case 'bin': {
-          var l = go(n.l), r = go(n.r);
+          var l = go(n.l, out), r = go(n.r, out);
           if (n.op === '+' || n.op === '-' || n.op === '*') return '(' + l + n.op + r + ')';
           if (n.op === '/') return mark('c_div') + '(' + l + ',' + r + ')';
           if (n.op === '%') return mark('c_mod') + '(' + l + ',' + r + ')';
           return mark('c_pow') + '(' + l + ',' + r + ')';
         }
+        case 'seq': {
+          var lo = tmp(), acc = tmp(), idx = tmp(), body, term, hi;
+          out.push('float ' + lo + ' = ' + go(n.lo, out) + ';');
+
+          if (n.op === 'sum' || n.op === 'prod') {
+            hi = tmp();
+            out.push('float ' + hi + ' = ' + go(n.hi, out) + ';');
+            out.push('float ' + acc + ' = ' + (n.op === 'sum' ? '0.0' : '1.0') + ';');
+            out.push('for (int ' + idx + ' = 0; ' + idx + ' < ' + SEQ_MAX + '; ' + idx + '++){');
+            body = [];
+            body.push('float ' + n.name + ' = ' + lo + ' + float(' + idx + ');');
+            body.push('if (' + n.name + ' > ' + hi + ' + 1e-9) break;');
+            term = go(n.body, body);
+            body.push(acc + (n.op === 'sum' ? ' += ' : ' *= ') + term + ';');
+            body.forEach(function (line) { out.push('  ' + line); });
+            out.push('}');
+            return acc;
+          }
+
+          if (n.op === 'integ') {
+            hi = tmp();
+            var h = tmp(), wt = tmp();
+            out.push('float ' + hi + ' = ' + go(n.hi, out) + ';');
+            out.push('float ' + h + ' = (' + hi + ' - ' + lo + ') / ' + SIMPSON_N + '.0;');
+            out.push('float ' + acc + ' = 0.0;');
+            out.push('for (int ' + idx + ' = 0; ' + idx + ' <= ' + SIMPSON_N + '; ' + idx + '++){');
+            body = [];
+            body.push('float ' + n.name + ' = ' + lo + ' + float(' + idx + ') * ' + h + ';');
+            body.push('float ' + wt + ' = (' + idx + ' == 0 || ' + idx + ' == ' + SIMPSON_N +
+              ') ? 1.0 : ((' + idx + ' % 2 == 1) ? 4.0 : 2.0);');
+            term = go(n.body, body);
+            body.push(acc + ' += ' + wt + ' * (' + term + ');');
+            body.forEach(function (line) { out.push('  ' + line); });
+            out.push('}');
+            var res = tmp();
+            out.push('float ' + res + ' = ' + acc + ' * ' + h + ' / 3.0;');
+            return res;
+          }
+
+          /* five-point stencil, unrolled: the samples are gathered into an
+             array first because the body may itself contain loops */
+          var hh = tmp(), arr = tmp();
+          out.push('float ' + hh + ' = ' + DERIV_H + ' * max(1.0, abs(' + lo + '));');
+          out.push('float ' + arr + '[5];');
+          out.push('for (int ' + idx + ' = 0; ' + idx + ' < 5; ' + idx + '++){');
+          body = [];
+          body.push('float ' + n.name + ' = ' + lo + ' + float(' + idx + ' - 2) * ' + hh + ';');
+          term = go(n.body, body);
+          body.push(arr + '[' + idx + '] = ' + term + ';');
+          body.forEach(function (line) { out.push('  ' + line); });
+          out.push('}');
+          var dv = tmp();
+          if (n.op === 'deriv2') {
+            out.push('float ' + dv + ' = (-' + arr + '[0] + 16.0*' + arr + '[1] - 30.0*' +
+              arr + '[2] + 16.0*' + arr + '[3] - ' + arr + '[4]) / (12.0*' + hh + '*' + hh + ');');
+          } else {
+            out.push('float ' + dv + ' = (' + arr + '[0] - 8.0*' + arr + '[1] + 8.0*' +
+              arr + '[3] - ' + arr + '[4]) / (12.0*' + hh + ');');
+          }
+          return dv;
+        }
         case 'call': {
-          var A = n.args.map(go);
+          var A = n.args.map(function (x) { return go(x, out); });
           if (n.name === 'root') {
             return mark('c_pow') + '(' + A[0] + ',' + mark('c_div') + '(1.0,' + A[1] + '))';
           }
+          if (n.name === 'iff') return '((' + A[0] + ' > 0.0) ? (' + A[1] + ') : (' + A[2] + '))';
+          if (n.name === 'lt') return '((' + A[0] + ' < ' + A[1] + ') ? 1.0 : 0.0)';
+          if (n.name === 'gt') return '((' + A[0] + ' > ' + A[1] + ') ? 1.0 : 0.0)';
           if (GLSL_HELPER[n.name]) return mark(GLSL_HELPER[n.name]) + '(' + A.join(',') + ')';
           if (GLSL_DIRECT[n.name]) return GLSL_DIRECT[n.name] + '(' + A.join(',') + ')';
           throw new Error('no GLSL mapping for ' + n.name);
         }
+        case 'user':
+          throw new Error('unresolved reference to ' + n.name + '(); link before emitting');
       }
       throw new Error('bad node');
     }
-    return { src: go(ast), used: used };
+
+    var stmts = [];
+    var expr = go(ast, stmts);
+    return {
+      src: expr,
+      stmts: stmts,
+      used: used,
+      params: Object.keys(ctx.params).sort()
+    };
   }
 
   /* GLSL twins of the H.* helpers.  Kept literally parallel on purpose:
@@ -1331,12 +2187,156 @@ details[open] summary::before { content: "\2212 "; }
     '  }',
     '  return x;',
     '}',
+    'vec2 zcmul(vec2 a, vec2 b){ return vec2(a.x*b.x - a.y*b.y, a.x*b.y + a.y*b.x); }',
+    'vec2 zcdiv(vec2 a, vec2 b){',
+    '  float d = b.x*b.x + b.y*b.y;',
+    '  if (d == 0.0) return vec2(VBAD, 0.0);',
+    '  return vec2((a.x*b.x + a.y*b.y)/d, (a.y*b.x - a.x*b.y)/d);',
+    '}',
+    'vec2 zcexp(vec2 z){ float m = exp(z.x); return vec2(m*cos(z.y), m*sin(z.y)); }',
+    'vec2 zclog(vec2 z){ return vec2(0.5*log(z.x*z.x + z.y*z.y), atan(z.y, z.x)); }',
+    'vec2 zrpow(float b, vec2 s){',
+    '  float L = log(b), m = exp(s.x*L);',
+    '  return vec2(m*cos(s.y*L), m*sin(s.y*L));',
+    '}',
+    'vec2 zcgamma(vec2 z){',
+    '  vec2 zz = z - vec2(1.0, 0.0);',
+    '  vec2 a = vec2(0.99999999999980993, 0.0);',
+    '  a += zcdiv(vec2(676.5203681218851, 0.0), zz + vec2(1.0, 0.0));',
+    '  a += zcdiv(vec2(-1259.1392167224028, 0.0), zz + vec2(2.0, 0.0));',
+    '  a += zcdiv(vec2(771.32342877765313, 0.0), zz + vec2(3.0, 0.0));',
+    '  a += zcdiv(vec2(-176.61502916214059, 0.0), zz + vec2(4.0, 0.0));',
+    '  a += zcdiv(vec2(12.507343278686905, 0.0), zz + vec2(5.0, 0.0));',
+    '  a += zcdiv(vec2(-0.13857109526572012, 0.0), zz + vec2(6.0, 0.0));',
+    '  a += zcdiv(vec2(9.9843695780195716e-6, 0.0), zz + vec2(7.0, 0.0));',
+    '  a += zcdiv(vec2(1.5056327351493116e-7, 0.0), zz + vec2(8.0, 0.0));',
+    '  vec2 tt = zz + vec2(7.5, 0.0);',
+    '  vec2 p = zcexp(zcmul(zz + vec2(0.5, 0.0), zclog(tt)));',
+    '  return zcmul(zcmul(vec2(2.5066282746310002, 0.0), p), zcmul(zcexp(-tt), a));',
+    '}',
+    'vec2 zEM(vec2 s){',
+    '  int NT = int(clamp(ceil(abs(s.y)) + 12.0, 14.0, 64.0));',
+    '  vec2 acc = vec2(0.0);',
+    '  for (int n = 1; n < 64; n++){',
+    '    if (n >= NT) break;',
+    '    acc += zrpow(float(n), -s);',
+    '  }',
+    '  float fN = float(NT);',
+    '  vec2 Ns = zrpow(fN, -s);',
+    '  acc += 0.5 * Ns;',
+    '  acc += zcdiv(zcmul(Ns, vec2(fN, 0.0)), s - vec2(1.0, 0.0));',
+    '  vec2 P = s;',
+    '  float Np = fN;',
+    '  for (int k = 0; k < 6; k++){',
+    '    float b = (k == 0) ? 0.08333333333333333 : ((k == 1) ? -0.001388888888888889',
+    '            : ((k == 2) ? 3.306878306878307e-5 : ((k == 3) ? -8.267195767195767e-7',
+    '            : ((k == 4) ? 2.087675698786810e-8 : -5.284190138687493e-10))));',
+    '    acc += (b / Np) * zcmul(Ns, P);',
+    '    float j = float(2*k + 1);',
+    '    P = zcmul(P, s + vec2(j, 0.0));',
+    '    P = zcmul(P, s + vec2(j + 1.0, 0.0));',
+    '    Np *= fN * fN;',
+    '  }',
+    '  return acc;',
+    '}',
+    'vec2 zetaC(vec2 s){',
+    '  if (abs(s.x - 1.0) < 1e-6 && abs(s.y) < 1e-6){ gPole = 1.0; return vec2(VBAD, 0.0); }',
+    '  if (s.x >= -2.5) return zEM(s);',
+    '  vec2 o = vec2(1.0, 0.0) - s;',
+    '  vec2 r = zcmul(zrpow(2.0, s), zrpow(PI, s - vec2(1.0, 0.0)));',
+    '  r = zcmul(r, vec2(sin(PI*s.x*0.5)*cosh(PI*s.y*0.5), cos(PI*s.x*0.5)*sinh(PI*s.y*0.5)));',
+    '  r = zcmul(r, zcgamma(o));',
+    '  return zcmul(r, zEM(o));',
+    '}',
+    'float c_zeta(float x){',
+    '  vec2 r = zetaC(vec2(x, 0.0));',
+    '  if (!(abs(r.x) < BIG)){ gPole = 1.0; return VBAD; }',
+    '  return r.x;',
+    '}',
+    'float c_zetare(float a, float b){ return zetaC(vec2(a, b)).x; }',
+    'float c_zetaim(float a, float b){ return zetaC(vec2(a, b)).y; }',
+    'float c_zetaabs(float a, float b){ vec2 r = zetaC(vec2(a, b)); return length(r); }',
+    'float c_zetaarg(float a, float b){ vec2 r = zetaC(vec2(a, b)); return atan(r.y, r.x); }',
+    'float c_eta(float x){',
+    '  if (abs(x - 1.0) < 1e-6) return 0.6931471805599453;',
+    '  vec2 r = zetaC(vec2(x, 0.0));',
+    '  if (!(abs(r.x) < BIG)) return VBAD;',
+    '  return (1.0 - pow(2.0, 1.0 - x)) * r.x;',
+    '}',
     'float c_lcm(float a, float b){',
     '  float g = c_gcd(a, b);',
     '  if (g < 0.5){ gPole = 1.0; return VBAD; }',
     '  return abs(floor(a + 0.5) * floor(b + 0.5)) / g;',
     '}'
   ].join('\n');
+
+  /* --------------------------------------------------- prelude assembly */
+  /* The helper library is large now that zeta is in it, and a shader that
+     only divides has no use for Lanczos gamma. The prelude is split into
+     units at load, dependencies are read straight out of each body, and a
+     shader gets only the transitive closure of what it actually calls. */
+  function splitPrelude(text) {
+    var lines = text.split('\n');
+    var header = [], units = {}, order = [];
+    var cur = null, depth = 0, buf = [];
+    var opener = /^(float|vec2|vec3|bool|int)\s+(\w+)\s*\(/;
+    for (var i = 0; i < lines.length; i++) {
+      var line = lines[i];
+      if (!cur) {
+        var m = opener.exec(line);
+        if (m) { cur = m[2]; buf = [line]; depth = 0; }
+        else { header.push(line); continue; }
+      } else {
+        buf.push(line);
+      }
+      for (var c = 0; c < line.length; c++) {
+        if (line[c] === '{') depth++;
+        else if (line[c] === '}') depth--;
+      }
+      if (cur && depth === 0 && buf.length && /[}]/.test(buf.join('\n'))) {
+        units[cur] = { src: buf.join('\n'), deps: [] };
+        order.push(cur);
+        cur = null; buf = [];
+      }
+    }
+    /* a unit depends on any other unit its body names */
+    order.forEach(function (name) {
+      var body = units[name].src;
+      order.forEach(function (other) {
+        if (other === name) return;
+        if (new RegExp('\\b' + other + '\\s*\\(').test(body)) {
+          units[name].deps.push(other);
+        }
+      });
+    });
+    return { header: header.join('\n'), units: units, order: order };
+  }
+
+  var PRELUDE_PARTS = null;
+  function preludeParts() {
+    if (!PRELUDE_PARTS) PRELUDE_PARTS = splitPrelude(GLSL_PRELUDE);
+    return PRELUDE_PARTS;
+  }
+
+  /* used: the map emitGLSL fills in with the helper names it emitted. */
+  function buildPrelude(used) {
+    var parts = preludeParts();
+    var out = [parts.header], seen = {}, stack = {};
+    function add(name) {
+      if (seen[name] || stack[name]) return;
+      var u = parts.units[name];
+      if (!u) return;
+      stack[name] = 1;
+      u.deps.forEach(add);
+      delete stack[name];
+      seen[name] = 1;
+      out.push(u.src);
+    }
+    var names = Object.keys(used || {});
+    if (!names.length) return parts.header;
+    names.forEach(add);
+    return out.join('\n');
+  }
 
   /* ------------------------------------------------------------- palettes */
   /* Every palette is a cyclic (or deliberately seamed) map [0,1) -> rgb.
@@ -1498,6 +2498,28 @@ details[open] summary::before { content: "\2212 "; }
       ]
     },
     {
+      group: 'Zeta', items: [
+        { name: 'Riemann zeta (real line)', expr: 'zeta(x) + y', ppu: 60 },
+        { name: 'Zeta of a product', expr: 'zeta(x * y)', ppu: 55 },
+        { name: 'Zeta modulus (s = x+iy)', expr: 'zetaabs(x, y)', ppu: 26 },
+        { name: 'Zeta phase (s = x+iy)', expr: 'zetaarg(x, y) * 2 / pi', ppu: 26 },
+        { name: 'Zeta real part', expr: 'zetare(x, y)', ppu: 26 },
+        { name: 'Zeta imaginary part', expr: 'zetaim(x, y)', ppu: 26 },
+        { name: 'Critical strip, log modulus', expr: 'log(zetaabs(x, y))', ppu: 22 },
+        { name: 'Dirichlet eta', expr: 'eta(x) + y', ppu: 60 }
+      ]
+    },
+    {
+      group: 'Calculus', items: [
+        { name: 'Slope of a sine', expr: 'deriv(u, x, sin(u * y))', ppu: 45 },
+        { name: 'Curvature', expr: 'deriv2(u, x, sin(u) * y)', ppu: 45 },
+        { name: 'Running integral', expr: 'integ(u, 0, x, sin(u * y))', ppu: 40 },
+        { name: 'Area under a Gaussian', expr: 'integ(u, 0, x, exp(-u^2 * y))', ppu: 50 },
+        { name: 'Derivative of gamma', expr: 'deriv(u, x, gamma(u)) / 8', ppu: 55 },
+        { name: 'Fresnel-like', expr: 'integ(u, 0, x, sin(u^2 + y))', ppu: 40 }
+      ]
+    },
+    {
       group: 'Surfaces', items: [
         { name: 'Saddle', expr: 'x^2 - y^2', ppu: 55 },
         { name: 'Radius', expr: 'r', ppu: 60 },
@@ -1514,8 +2536,11 @@ details[open] summary::before { content: "\2212 "; }
     CONT_OFF: CONT_OFF, CONT_PRINCIPAL: CONT_PRINCIPAL, CONT_REFLECT: CONT_REFLECT,
     RT: RT, H: H, bad: bad,
     normalize: normalize, tokenize: tokenize, parse: parse, analyze: analyze,
+    parseDefinition: parseDefinition, link: link, substitute: substitute,
+    SEQ_MAX: SEQ_MAX, SIMPSON_N: SIMPSON_N, SEQ: SEQ,
     compileJS: compileJS, closureTree: closureTree, emitGLSL: emitGLSL, glslNum: glslNum,
     GLSL_PRELUDE: GLSL_PRELUDE, GLSL_PALETTE: GLSL_PALETTE,
+    buildPrelude: buildPrelude, splitPrelude: splitPrelude,
     PALETTES: PALETTES, paletteRGB: paletteRGB, paletteMean: paletteMean,
     hsl2rgb: hsl2rgb, tri: tri,
     PRESETS: PRESETS, FUNCS: FUNCS, FN_ALIAS: FN_ALIAS, CONSTS: CONSTS, VARS: VARS
@@ -1740,6 +2765,463 @@ details[open] summary::before { content: "\2212 "; }
 })(typeof globalThis !== 'undefined' ? globalThis : this);
 </script>
 <script>/* =========================================================================
+   Operation Color Graph — scale notes
+   Read one unit between integers as one metre, then say what the visible
+   span is comparable to. Purely descriptive; nothing here feeds the render.
+   ========================================================================= */
+(function (root) {
+  'use strict';
+
+  /* size in metres, ascending */
+  var THINGS = [
+    [1.6e-35, 'the Planck length'],
+    [1e-18, 'the reach of a quark'],
+    [1e-15, 'a proton'],
+    [1e-14, 'a uranium nucleus'],
+    [1e-12, 'a gamma-ray wavelength'],
+    [5.3e-11, 'the Bohr radius of hydrogen'],
+    [3e-10, 'a water molecule'],
+    [2e-9, 'the width of DNA'],
+    [1e-8, 'a cell membrane'],
+    [9e-8, 'an influenza virus'],
+    [5e-7, 'a wavelength of green light'],
+    [2e-6, 'an E. coli bacterium'],
+    [7e-6, 'a red blood cell'],
+    [7e-5, 'a human hair'],
+    [5e-4, 'a grain of sand'],
+    [4e-3, 'a grain of rice'],
+    [2.5e-2, 'a human thumb'],
+    [0.3, 'a forearm'],
+    [1.7, 'an adult human'],
+    [6, 'a giraffe'],
+    [30, 'a blue whale'],
+    [93, 'the Statue of Liberty'],
+    [330, 'the Eiffel Tower'],
+    [828, 'the Burj Khalifa'],
+    [5e3, 'a small city'],
+    [4.2e4, 'the Panama Canal'],
+    [3.5e5, 'the orbit of the ISS'],
+    [2.4e6, 'Greenland'],
+    [1.27e7, 'the Earth'],
+    [3.84e8, 'the distance to the Moon'],
+    [1.39e9, 'the Sun'],
+    [1.5e11, 'the Earth\u2013Sun distance'],
+    [9e12, 'the orbit of Neptune'],
+    [4e16, 'the distance to Proxima Centauri'],
+    [1e19, 'a spiral arm of the galaxy'],
+    [9.5e20, 'the Milky Way'],
+    [2.4e22, 'the distance to Andromeda'],
+    [1e24, 'the Virgo Supercluster'],
+    [8.8e26, 'the observable universe']
+  ];
+
+  function metres(v) {
+    var a = Math.abs(v);
+    if (!isFinite(a) || a === 0) return '0 m';
+    var units = [
+      [1e-24, 'ym'], [1e-21, 'zm'], [1e-18, 'am'], [1e-15, 'fm'], [1e-12, 'pm'],
+      [1e-9, 'nm'], [1e-6, '\u00b5m'], [1e-3, 'mm'], [1, 'm'], [1e3, 'km'],
+      [1e6, 'Mm'], [1e9, 'Gm'], [1.495978707e11, 'AU'],
+      [9.4607e15, 'ly'], [9.4607e18, 'kly'], [9.4607e21, 'Mly'], [9.4607e24, 'Gly']
+    ];
+    var pick = units[0];
+    for (var i = 0; i < units.length; i++) if (a >= units[i][0]) pick = units[i];
+    var n = a / pick[0];
+    var txt = n >= 100 ? n.toFixed(0) : (n >= 10 ? n.toFixed(1) : n.toFixed(2));
+    return txt + ' ' + pick[1];
+  }
+
+  /* Nearest comparison on a log scale, with how far off it is. */
+  function compare(span) {
+    if (!isFinite(span) || span <= 0) return null;
+    var best = null, bestD = Infinity;
+    for (var i = 0; i < THINGS.length; i++) {
+      var d = Math.abs(Math.log(span / THINGS[i][0]));
+      if (d < bestD) { bestD = d; best = THINGS[i]; }
+    }
+    var ratio = span / best[0];
+    var qual;
+    if (ratio > 3) qual = Math.round(ratio) + '\u00d7 wider than ';
+    else if (ratio < 1 / 3) qual = Math.round(1 / ratio) + '\u00d7 narrower than ';
+    else if (ratio > 1.25) qual = 'a little wider than ';
+    else if (ratio < 0.8) qual = 'a little narrower than ';
+    else qual = 'about the size of ';
+    return { text: qual + best[1], thing: best[1], metres: metres(span), ratio: ratio };
+  }
+
+  function note(span) {
+    var c = compare(span);
+    if (!c) return '';
+    return 'Reading one unit as one metre, this view spans ' + c.metres +
+      ' \u2014 ' + c.text + '.';
+  }
+
+  var API = { THINGS: THINGS, metres: metres, compare: compare, note: note };
+  if (typeof module === 'object' && module.exports) module.exports = API;
+  root.OCGSCALE = API;
+})(typeof globalThis !== 'undefined' ? globalThis : this);
+</script>
+<script>/* =========================================================================
+   Operation Color Graph — settings
+   A versioned, validated snapshot of everything worth keeping: the function
+   library, the view, colour, contours, effects and the formula history.
+   Loading never trusts the file; every field is range-checked before use.
+   ========================================================================= */
+(function (root) {
+  'use strict';
+
+  var VERSION = 4;
+
+  /* field -> [kind, min, max] ; kind is n(umber), i(nteger), b(oolean),
+     s(tring), a(rray of strings) or o(bject of numbers) */
+  var SCHEMA = {
+    expr: ['s'],
+    defs: ['a'],
+    graphIndex: ['i', 0, 63],
+    recurseDepth: ['i', 0, 24],
+    recurseSeed: ['n', -1e6, 1e6],
+    params: ['o', -1e9, 1e9],
+
+    cx: ['n', -1e30, 1e30],
+    cy: ['n', -1e30, 1e30],
+    ppu: ['n', 1e-12, 1e18],
+
+    palette: ['i', 0, 63],
+    colA: ['s'], colB: ['s'],
+    bands: ['i', 2, 64],
+    freq: ['n', 0.001, 1000],
+    phase: ['n', 0, 1],
+    freqMode: ['i', 0, 2],
+    freqFollowsZoom: ['b'],        // read from files written before freqMode
+    cycling: ['b'],
+    cycleSpeed: ['n', 0.001, 100],
+    cycleReverse: ['b'],
+
+    lines: ['b'],
+    lineW: ['n', 0.1, 40],
+    parity: ['b'],
+    set: ['i', 0, 31],
+    setN: ['n', 0.001, 1000],
+
+    cont: ['i', 0, 2],
+    repair: ['b'],
+    markCont: ['b'],
+
+    aa: ['b'],
+    ss: ['i', 1, 4],
+    grid: ['b'],
+    gridAlpha: ['n', 0, 1],
+    boldAxes: ['b'],
+    reticle: ['b'],
+    scaleNote: ['b'],
+    backendPref: ['s'],
+
+    postKernel: ['i', 0, 8],
+    postKernelAmt: ['n', 0, 1],
+    postDither: ['i', 0, 3],
+    postDitherAmt: ['n', 0, 4],
+    postLevels: ['i', 1, 256],
+    postGrain: ['n', 0, 1],
+    postScan: ['n', 0, 1],
+    postVignette: ['n', 0, 1],
+
+    autoSpeed: ['n', 0.01, 20],
+
+    outW: ['i', 16, 16384],
+    outH: ['i', 16, 16384],
+    outRatio: ['s'],
+    outLock: ['b'],
+    outGuides: ['b'],
+    vidFormat: ['s'],
+    vidSecs: ['n', 0.5, 120],
+    vidFps: ['i', 1, 120],
+    vidRate: ['n', 1, 1000],
+    vidMode: ['s'],
+    vidZoom: ['n', 1.01, 1e6],
+    vidUseSize: ['b'],
+
+    timeSpeed: ['n', 0.001, 100],
+    history: ['a']
+  };
+
+  var HEX = /^#[0-9a-fA-F]{6}$/;
+
+  function clampNum(v, lo, hi) {
+    v = Number(v);
+    if (!isFinite(v)) return null;
+    if (lo !== undefined && v < lo) v = lo;
+    if (hi !== undefined && v > hi) v = hi;
+    return v;
+  }
+
+  /* Pull only known fields out of a live state object. */
+  function capture(S, extra) {
+    var out = { version: VERSION, saved: new Date().toISOString() };
+    for (var key in SCHEMA) {
+      if (S[key] === undefined) continue;
+      out[key] = S[key];
+    }
+    if (extra) for (var k in extra) out[k] = extra[k];
+    return out;
+  }
+
+  /* Validate an incoming object; returns { values, warnings }. Unknown and
+     malformed fields are dropped rather than applied. */
+  function validate(raw) {
+    var values = {}, warnings = [];
+    if (!raw || typeof raw !== 'object') {
+      return { values: values, warnings: ['That file does not look like a settings file.'] };
+    }
+    if (raw.version !== undefined && Number(raw.version) > VERSION) {
+      warnings.push('Saved by a newer version; unknown settings were ignored.');
+    }
+    for (var key in SCHEMA) {
+      if (!Object.prototype.hasOwnProperty.call(raw, key)) continue;
+      var spec = SCHEMA[key], v = raw[key];
+      switch (spec[0]) {
+        case 'b':
+          if (typeof v !== 'boolean') { warnings.push(key + ': expected true or false'); break; }
+          values[key] = v; break;
+        case 'n': {
+          var n = clampNum(v, spec[1], spec[2]);
+          if (n === null) { warnings.push(key + ': not a number'); break; }
+          values[key] = n; break;
+        }
+        case 'i': {
+          var i = clampNum(v, spec[1], spec[2]);
+          if (i === null) { warnings.push(key + ': not a number'); break; }
+          values[key] = Math.round(i); break;
+        }
+        case 's':
+          if (typeof v !== 'string' || v.length > 4000) { warnings.push(key + ': bad text'); break; }
+          if ((key === 'colA' || key === 'colB') && !HEX.test(v)) {
+            warnings.push(key + ': not a #rrggbb colour'); break;
+          }
+          values[key] = v; break;
+        case 'a': {
+          if (!Array.isArray(v)) { warnings.push(key + ': expected a list'); break; }
+          var list = v.filter(function (e) { return typeof e === 'string' && e.length <= 4000; });
+          values[key] = list.slice(0, 200);
+          break;
+        }
+        case 'o': {
+          if (!v || typeof v !== 'object' || Array.isArray(v)) {
+            warnings.push(key + ': expected an object'); break;
+          }
+          var obj = {}, n2 = 0;
+          for (var pk in v) {
+            if (!/^[A-Za-z_][A-Za-z0-9_]{0,31}$/.test(pk)) continue;
+            var pv = clampNum(v[pk], spec[1], spec[2]);
+            if (pv === null) continue;
+            obj[pk] = pv;
+            if (++n2 >= 64) break;
+          }
+          values[key] = obj;
+          break;
+        }
+      }
+    }
+    return { values: values, warnings: warnings };
+  }
+
+  function serialize(S, extra) {
+    return JSON.stringify(capture(S, extra), null, 2);
+  }
+
+  function parse(text) {
+    var raw;
+    try { raw = JSON.parse(text); }
+    catch (e) { return { values: {}, warnings: ['That file is not valid JSON.'] }; }
+    return validate(raw);
+  }
+
+  var API = {
+    VERSION: VERSION, SCHEMA: SCHEMA,
+    capture: capture, validate: validate, serialize: serialize, parse: parse
+  };
+  if (typeof module === 'object' && module.exports) module.exports = API;
+  root.OCGSET = API;
+})(typeof globalThis !== 'undefined' ? globalThis : this);
+</script>
+<script>/* =========================================================================
+   Operation Color Graph — lossless containers
+   WebM is a lossy codec, so fine banding comes back blurred. These two
+   writers keep the exact pixels the renderer produced: a stored (uncompressed)
+   ZIP of PNG frames for editing elsewhere, and an APNG that plays and loops
+   on its own. PNG is already deflate-compressed, so storing it verbatim
+   costs nothing.
+   ========================================================================= */
+(function (root) {
+  'use strict';
+
+  /* ------------------------------------------------------------- CRC-32 */
+  var CRC_TABLE = (function () {
+    var t = new Uint32Array(256);
+    for (var n = 0; n < 256; n++) {
+      var c = n;
+      for (var k = 0; k < 8; k++) c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1);
+      t[n] = c >>> 0;
+    }
+    return t;
+  })();
+
+  function crc32(bytes, start, end) {
+    start = start || 0;
+    end = end === undefined ? bytes.length : end;
+    var c = 0xFFFFFFFF;
+    for (var i = start; i < end; i++) c = CRC_TABLE[(c ^ bytes[i]) & 0xFF] ^ (c >>> 8);
+    return (c ^ 0xFFFFFFFF) >>> 0;
+  }
+
+  function concat(parts) {
+    var total = 0, i;
+    for (i = 0; i < parts.length; i++) total += parts[i].length;
+    var out = new Uint8Array(total), at = 0;
+    for (i = 0; i < parts.length; i++) { out.set(parts[i], at); at += parts[i].length; }
+    return out;
+  }
+
+  /* ---------------------------------------------------------------- ZIP */
+  /* Store method only: no second round of compression over already
+     compressed PNGs, and no dependency on a deflate implementation. */
+  function u16(v) { return [v & 0xFF, (v >>> 8) & 0xFF]; }
+  function u32(v) { return [v & 0xFF, (v >>> 8) & 0xFF, (v >>> 16) & 0xFF, (v >>> 24) & 0xFF]; }
+
+  function zip(files) {
+    var locals = [], central = [], offset = 0;
+    files.forEach(function (f) {
+      var nameBytes = [];
+      for (var i = 0; i < f.name.length; i++) nameBytes.push(f.name.charCodeAt(i) & 0xFF);
+      var data = f.data;
+      var crc = crc32(data);
+      var head = [].concat(
+        u32(0x04034b50), u16(20), u16(0), u16(0),
+        u16(0), u16(0),                          // no timestamp: byte-identical reruns
+        u32(crc), u32(data.length), u32(data.length),
+        u16(nameBytes.length), u16(0), nameBytes
+      );
+      locals.push(new Uint8Array(head), data);
+      central.push(new Uint8Array([].concat(
+        u32(0x02014b50), u16(20), u16(20), u16(0), u16(0),
+        u16(0), u16(0),
+        u32(crc), u32(data.length), u32(data.length),
+        u16(nameBytes.length), u16(0), u16(0), u16(0), u16(0),
+        u32(0), u32(offset), nameBytes
+      )));
+      offset += head.length + data.length;
+    });
+    var dir = concat(central);
+    var end = new Uint8Array([].concat(
+      u32(0x06054b50), u16(0), u16(0),
+      u16(files.length), u16(files.length),
+      u32(dir.length), u32(offset), u16(0)
+    ));
+    return concat([concat(locals), dir, end]);
+  }
+
+  /* --------------------------------------------------------------- APNG */
+  var PNG_SIG = [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A];
+
+  function readU32(b, at) {
+    return ((b[at] << 24) | (b[at + 1] << 16) | (b[at + 2] << 8) | b[at + 3]) >>> 0;
+  }
+
+  /* Walks a PNG's chunk list. Returns { ihdr, idat: [...], width, height }. */
+  function readPNG(bytes) {
+    for (var i = 0; i < 8; i++) {
+      if (bytes[i] !== PNG_SIG[i]) throw new Error('not a PNG');
+    }
+    var at = 8, ihdr = null, idat = [];
+    while (at + 8 <= bytes.length) {
+      var len = readU32(bytes, at);
+      var type = String.fromCharCode(bytes[at + 4], bytes[at + 5], bytes[at + 6], bytes[at + 7]);
+      var body = bytes.subarray(at + 8, at + 8 + len);
+      if (type === 'IHDR') ihdr = body;
+      else if (type === 'IDAT') idat.push(body);
+      else if (type === 'IEND') break;
+      at += 12 + len;
+    }
+    if (!ihdr) throw new Error('PNG has no header');
+    return {
+      ihdr: ihdr, idat: idat,
+      width: readU32(ihdr, 0), height: readU32(ihdr, 4)
+    };
+  }
+
+  function chunk(type, body) {
+    var head = new Uint8Array(8);
+    head[0] = (body.length >>> 24) & 0xFF; head[1] = (body.length >>> 16) & 0xFF;
+    head[2] = (body.length >>> 8) & 0xFF; head[3] = body.length & 0xFF;
+    for (var i = 0; i < 4; i++) head[4 + i] = type.charCodeAt(i);
+    var forCrc = concat([head.subarray(4), body]);
+    var c = crc32(forCrc);
+    return concat([head, body, new Uint8Array([
+      (c >>> 24) & 0xFF, (c >>> 16) & 0xFF, (c >>> 8) & 0xFF, c & 0xFF
+    ])]);
+  }
+
+  /* Assembles frames (each a complete PNG) into one animated PNG.
+     delayNum/delayDen express the frame delay as an exact fraction, so a
+     30 fps loop is 1/30 rather than a rounded number of milliseconds. */
+  function apng(frames, delayNum, delayDen, plays) {
+    if (!frames.length) throw new Error('no frames');
+    var first = readPNG(frames[0]);
+    var parts = [new Uint8Array(PNG_SIG), chunk('IHDR', first.ihdr)];
+    var seq = 0;
+
+    var actl = new Uint8Array(8);
+    actl[0] = (frames.length >>> 24) & 0xFF; actl[1] = (frames.length >>> 16) & 0xFF;
+    actl[2] = (frames.length >>> 8) & 0xFF; actl[3] = frames.length & 0xFF;
+    var np = plays || 0;                       // 0 means loop forever
+    actl[4] = (np >>> 24) & 0xFF; actl[5] = (np >>> 16) & 0xFF;
+    actl[6] = (np >>> 8) & 0xFF; actl[7] = np & 0xFF;
+    parts.push(chunk('acTL', actl));
+
+    function fctl(sn, w, h) {
+      var b = new Uint8Array(26);
+      b[0] = (sn >>> 24) & 0xFF; b[1] = (sn >>> 16) & 0xFF;
+      b[2] = (sn >>> 8) & 0xFF; b[3] = sn & 0xFF;
+      b[4] = (w >>> 24) & 0xFF; b[5] = (w >>> 16) & 0xFF;
+      b[6] = (w >>> 8) & 0xFF; b[7] = w & 0xFF;
+      b[8] = (h >>> 24) & 0xFF; b[9] = (h >>> 16) & 0xFF;
+      b[10] = (h >>> 8) & 0xFF; b[11] = h & 0xFF;
+      /* x_offset and y_offset stay zero: every frame is a full replacement */
+      b[20] = (delayNum >>> 8) & 0xFF; b[21] = delayNum & 0xFF;
+      b[22] = (delayDen >>> 8) & 0xFF; b[23] = delayDen & 0xFF;
+      b[24] = 0;                               // dispose: none
+      b[25] = 0;                               // blend: source, so frames are exact
+      return b;
+    }
+
+    for (var f = 0; f < frames.length; f++) {
+      var png = readPNG(frames[f]);
+      if (png.width !== first.width || png.height !== first.height) {
+        throw new Error('frame ' + f + ' is a different size');
+      }
+      parts.push(chunk('fcTL', fctl(seq++, png.width, png.height)));
+      for (var d = 0; d < png.idat.length; d++) {
+        if (f === 0) {
+          parts.push(chunk('IDAT', png.idat[d]));
+        } else {
+          var body = new Uint8Array(4 + png.idat[d].length);
+          body[0] = (seq >>> 24) & 0xFF; body[1] = (seq >>> 16) & 0xFF;
+          body[2] = (seq >>> 8) & 0xFF; body[3] = seq & 0xFF;
+          seq++;
+          body.set(png.idat[d], 4);
+          parts.push(chunk('fdAT', body));
+        }
+      }
+    }
+    parts.push(chunk('IEND', new Uint8Array(0)));
+    return concat(parts);
+  }
+
+  var API = { crc32: crc32, zip: zip, apng: apng, readPNG: readPNG, chunk: chunk, concat: concat };
+  if (typeof module === 'object' && module.exports) module.exports = API;
+  root.OCGENC = API;
+})(typeof globalThis !== 'undefined' ? globalThis : this);
+</script>
+<script>/* =========================================================================
    Operation Color Graph — expression rendering
    The same AST the renderer compiles is also drawn as maths, so what you see
    is exactly how the expression was parsed. MathML renders natively in every
@@ -1756,6 +3238,7 @@ details[open] summary::before { content: "\2212 "; }
       return 7;                                    // ^
     }
     if (n.k === 'neg') return 2;
+    if (n.k === 'seq') return 2;
     return 99;                                     // atoms and calls
   }
 
@@ -1765,6 +3248,7 @@ details[open] summary::before { content: "\2212 "; }
     sinh: 1, cosh: 1, tanh: 1, sech: 1, csch: 1, coth: 1, erf: 1, gcd: 1, lcm: 1
   };
   var LATEX_FN = {
+    zeta: '\\zeta', eta: '\\eta',
     asin: '\\arcsin', acos: '\\arccos', atan: '\\arctan',
     log2: '\\log_2', log10: '\\log_{10}', gamma: '\\Gamma', lgamma: '\\ln\\Gamma',
     lambertw: 'W', sinc: '\\operatorname{sinc}', beta: '\\mathrm{B}'
@@ -1805,6 +3289,27 @@ details[open] summary::before { content: "\2212 "; }
       switch (n.k) {
         case 'num': return '<mn>' + esc(numText(n.v)) + '</mn>';
         case 'var': return '<mi>' + esc(n.name) + '</mi>';
+        case 'param': return '<mi mathvariant="italic">' + esc(n.name) + '</mi>';
+        case 'seq': {
+          if (n.op === 'deriv' || n.op === 'deriv2') {
+            var ord = n.op === 'deriv2' ? '<mn>2</mn>' : '';
+            return '<mrow><mfrac><mrow><mo>d</mo>' + ord + '</mrow>' +
+              '<mrow><mo>d</mo><mi>' + esc(n.name) + '</mi>' + ord + '</mrow></mfrac>' +
+              wrap(n.body, 3) +
+              '<mo stretchy="true">|</mo><msub><mrow></mrow><mrow><mi>' + esc(n.name) +
+              '</mi><mo>=</mo>' + go(n.lo) + '</mrow></msub></mrow>';
+          }
+          if (n.op === 'integ') {
+            return '<mrow><msubsup><mo>&#x222B;</mo><mrow>' + go(n.lo) + '</mrow>' +
+              '<mrow>' + go(n.hi) + '</mrow></msubsup>' + wrap(n.body, 3) +
+              '<mo>d</mo><mi>' + esc(n.name) + '</mi></mrow>';
+          }
+          var big = n.op === 'sum' ? '&#x2211;' : '&#x220F;';
+          return '<mrow><munderover><mo>' + big + '</mo>' +
+            '<mrow><mi>' + esc(n.name) + '</mi><mo>=</mo>' + go(n.lo) + '</mrow>' +
+            '<mrow>' + go(n.hi) + '</mrow></munderover>' +
+            wrap(n.body, 3) + '</mrow>';
+        }
         case 'neg': return '<mrow><mo>&#x2212;</mo>' + wrap(n.a, 2) + '</mrow>';
         case 'bin': {
           if (n.op === '/') {
@@ -1864,6 +3369,21 @@ details[open] summary::before { content: "\2212 "; }
           return txt;
         }
         case 'var': return n.name;
+        case 'param': return n.name;
+        case 'seq': {
+          if (n.op === 'deriv' || n.op === 'deriv2') {
+            var o2 = n.op === 'deriv2' ? '^{2}' : '';
+            return '\\left.\\frac{d' + o2 + '}{d' + n.name + o2 + '}' +
+              wrap(n.body, 3) + '\\right|_{' + n.name + '=' + go(n.lo) + '}';
+          }
+          if (n.op === 'integ') {
+            return '\\int_{' + go(n.lo) + '}^{' + go(n.hi) + '} ' +
+              wrap(n.body, 3) + '\\,d' + n.name;
+          }
+          var big = n.op === 'sum' ? '\\sum' : '\\prod';
+          return big + '_{' + n.name + '=' + go(n.lo) + '}^{' + go(n.hi) + '} ' +
+            wrap(n.body, 3);
+        }
         case 'neg': return '-' + wrap(n.a, 2);
         case 'bin': {
           if (n.op === '/') return '\\frac{' + go(n.l) + '}{' + go(n.r) + '}';
@@ -1905,12 +3425,16 @@ details[open] summary::before { content: "\2212 "; }
   function canonical(ast) {
     function group(n) {
       var s = go(n);
-      return (n.k === 'bin' || n.k === 'neg') ? '(' + s + ')' : s;
+      return (n.k === 'bin' || n.k === 'neg' || n.k === 'seq') ? '(' + s + ')' : s;
     }
     function go(n) {
       switch (n.k) {
         case 'num': return numText(n.v);
         case 'var': return n.name;
+        case 'param': return n.name;
+        case 'seq':
+          return n.op + '(' + n.name + ', ' + go(n.lo) +
+            (n.hi ? ', ' + go(n.hi) : '') + ', ' + go(n.body) + ')';
         case 'neg': return '-' + group(n.a);
         case 'bin':
           if (n.op === '^') return group(n.l) + '^' + group(n.r);
@@ -1949,6 +3473,7 @@ details[open] summary::before { content: "\2212 "; }
   var FIELD_UNIFORMS = [
     'uniform vec2 uCenter;',
     'uniform vec2 uSize;',
+    'uniform vec2 uOrigin;',
     'uniform float uUPP;',
     'uniform float uTime;',
     'uniform int uCont;',
@@ -2052,14 +3577,21 @@ details[open] summary::before { content: "\2212 "; }
   ].join('\n');
 
   /* F(x, y) wraps the user expression, exposing r and a as locals. */
-  function fieldFn(exprSrc) {
+  function fieldFn(g) {
+    var stmts = (g.stmts || []).map(function (l) { return '  ' + l; });
     return [
       'float F(float x, float y){',
       '  float r = sqrt(x * x + y * y);',
-      '  float a = (x == 0.0 && y == 0.0) ? 0.0 : atan(y, x);',
-      '  return ' + exprSrc + ';',
+      '  float a = (x == 0.0 && y == 0.0) ? 0.0 : atan(y, x);'
+    ].concat(stmts).concat([
+      '  return ' + g.src + ';',
       '}'
-    ].join('\n');
+    ]).join('\n');
+  }
+
+  /* One uniform per free variable, so moving a slider costs no recompile. */
+  function paramUniforms(g) {
+    return (g.params || []).map(function (n) { return 'uniform float p_' + n + ';'; }).join('\n');
   }
 
   /* Removable-singularity repair: probe four neighbours; accept the fill only
@@ -2080,17 +3612,21 @@ details[open] summary::before { content: "\2212 "; }
   ].join('\n');
 
   /* Pass 1 of 2: evaluate the field into an RGBA32F target. */
-  function buildFieldFS(exprSrc) {
+  /* Takes the emitter result, never a bare string: a sum or a derivative
+     puts its work in g.stmts, and accepting a string would silently drop it. */
+  function buildFieldFS(g) {
+    if (typeof g === 'string') throw new Error('buildFieldFS needs the emitGLSL result, not a string');
     return [
       '#version 300 es',
       'precision highp float;',
       'precision highp int;',
       FIELD_UNIFORMS,
+      paramUniforms(g),
       'out vec4 outColor;',
-      C.GLSL_PRELUDE,
-      fieldFn(exprSrc),
+      C.buildPrelude(g.used),
+      fieldFn(g),
       'void main(){',
-      '  vec2 p = uCenter + (gl_FragCoord.xy - uSize * 0.5) * uUPP;',
+      '  vec2 p = uCenter + (gl_FragCoord.xy + uOrigin - uSize * 0.5) * uUPP;',
       '  gCont = 0.0; gPole = 0.0;',
       '  float v = F(p.x, p.y);',
       '  float cont = gCont, pole = gPole;',
@@ -2137,17 +3673,19 @@ details[open] summary::before { content: "\2212 "; }
 
   /* Fallback for contexts without renderable float textures: one pass, no
      field cache.  Derivatives come from explicit finite differences. */
-  function buildSinglePassFS(exprSrc) {
+  function buildSinglePassFS(g) {
+    if (typeof g === 'string') throw new Error('buildSinglePassFS needs the emitGLSL result, not a string');
     return [
       '#version 300 es',
       'precision highp float;',
       'precision highp int;',
       FIELD_UNIFORMS,
+      paramUniforms(g),
       'uniform int uSS;',
       SHADE_UNIFORMS,
       'out vec4 outColor;',
-      C.GLSL_PRELUDE,
-      fieldFn(exprSrc),
+      C.buildPrelude(g.used),
+      fieldFn(g),
       C.GLSL_PALETTE,
       SETS.GLSL_SETS,
       COLOUR_FN,
@@ -2169,7 +3707,7 @@ details[open] summary::before { content: "\2212 "; }
       'void main(){',
       '  float ssf = float(uSS);',
       '  float sub = uUPP / ssf;',
-      '  vec2 p0 = uCenter + (gl_FragCoord.xy - uSize * 0.5) * uUPP;',
+      '  vec2 p0 = uCenter + (gl_FragCoord.xy + uOrigin - uSize * 0.5) * uUPP;',
       '  vec3 acc = vec3(0.0);',
       '  for (int j = 0; j < 4; j++){',
       '    if (j >= uSS) break;',
@@ -2184,11 +3722,105 @@ details[open] summary::before { content: "\2212 "; }
     ].join('\n');
   }
 
+  /* ------------------------------------------------------------ post pass */
+  /* Runs over the finished colour image: kernel, posterise, dither, grain,
+     scanlines, vignette. Ordered dithering uses a Bayer matrix so a reduced
+     palette still reads as a smooth gradient. */
+  function buildPostFS() {
+    return [
+      '#version 300 es',
+      'precision highp float;',
+      'precision highp int;',
+      'uniform sampler2D uImage;',
+      'uniform vec2 uTexel;',
+      'uniform vec2 uOrigin;',
+      'uniform vec2 uSize;',
+      'uniform int uKernel;',
+      'uniform int uDither;',
+      'uniform int uLevels;',
+      'uniform float uKernelAmt;',
+      'uniform float uDitherAmt;',
+      'uniform float uGrain;',
+      'uniform float uScan;',
+      'uniform float uVignette;',
+      'uniform float uSeed;',
+      'out vec4 outColor;',
+      'float bayer4(vec2 p){',
+      '  int x = int(mod(p.x, 4.0)), y = int(mod(p.y, 4.0));',
+      '  int i = y * 4 + x;',
+      '  float m[16] = float[16](0.0,8.0,2.0,10.0, 12.0,4.0,14.0,6.0,',
+      '                          3.0,11.0,1.0,9.0, 15.0,7.0,13.0,5.0);',
+      '  return m[i] / 16.0 - 0.5;',
+      '}',
+      'float bayer8(vec2 p){',
+      /* the 8x8 matrix is the 4x4 recursed once, which is cheaper than a
+         64-entry table and gives the same values */
+      '  float a = bayer4(p) + 0.5;',
+      '  float b = bayer4(floor(p * 0.5)) + 0.5;',
+      '  return (a * 0.25 + b) * 0.25 * 4.0 - 0.5;',
+      '}',
+      'float hash(vec2 p){',
+      '  return fract(sin(dot(p, vec2(12.9898, 78.233)) + uSeed) * 43758.5453);',
+      '}',
+      'vec3 kernelAt(vec2 uv){',
+      '  vec3 c = texture(uImage, uv).rgb;',
+      '  if (uKernel == 0) return c;',
+      '  vec3 n = texture(uImage, uv + vec2(0.0, uTexel.y)).rgb;',
+      '  vec3 s = texture(uImage, uv - vec2(0.0, uTexel.y)).rgb;',
+      '  vec3 e = texture(uImage, uv + vec2(uTexel.x, 0.0)).rgb;',
+      '  vec3 w = texture(uImage, uv - vec2(uTexel.x, 0.0)).rgb;',
+      '  if (uKernel == 1){',                      // sharpen
+      '    vec3 sharp = c * 5.0 - (n + s + e + w);',
+      '    return mix(c, clamp(sharp, 0.0, 1.0), uKernelAmt);',
+      '  }',
+      '  if (uKernel == 2){',                      // soften
+      '    return mix(c, (c + n + s + e + w) * 0.2, uKernelAmt);',
+      '  }',
+      '  if (uKernel == 3){',                      // edges
+      '    vec3 g = abs(e - w) + abs(n - s);',
+      '    return mix(c, clamp(g, 0.0, 1.0), uKernelAmt);',
+      '  }',
+      '  if (uKernel == 4){',                      // emboss
+      '    vec3 g = (c - texture(uImage, uv - uTexel).rgb) + 0.5;',
+      '    return mix(c, clamp(g, 0.0, 1.0), uKernelAmt);',
+      '  }',
+      '  return c;',
+      '}',
+      'void main(){',
+      '  vec2 frag = gl_FragCoord.xy + uOrigin;',
+      '  vec2 uv = gl_FragCoord.xy * uTexel;',
+      '  vec3 col = kernelAt(uv);',
+      '  if (uDither != 0 && uLevels > 1){',
+      '    float d = 0.0;',
+      '    if (uDither == 1) d = bayer4(frag);',
+      '    else if (uDither == 2) d = bayer8(frag);',
+      '    else d = hash(frag) - 0.5;',
+      '    col += d * uDitherAmt / float(uLevels);',
+      '  }',
+      '  if (uLevels > 1){',
+      '    float n = float(uLevels);',
+      '    col = floor(clamp(col, 0.0, 1.0) * n + 0.5) / n;',
+      '  }',
+      '  if (uScan > 0.0){',
+      '    float line = 0.5 + 0.5 * cos(frag.y * 3.14159265);',
+      '    col *= 1.0 - uScan * line;',
+      '  }',
+      '  if (uGrain > 0.0) col += (hash(frag * 1.7) - 0.5) * uGrain;',
+      '  if (uVignette > 0.0){',
+      '    vec2 q = frag / max(uSize, vec2(1.0)) - 0.5;',
+      '    col *= 1.0 - uVignette * clamp(dot(q, q) * 2.2, 0.0, 1.0);',
+      '  }',
+      '  outColor = vec4(clamp(col, 0.0, 1.0), 1.0);',
+      '}'
+    ].join('\n');
+  }
+
   var API = {
     VS: VS,
     buildFieldFS: buildFieldFS,
     buildColorFS: buildColorFS,
-    buildSinglePassFS: buildSinglePassFS
+    buildSinglePassFS: buildSinglePassFS,
+    buildPostFS: buildPostFS
   };
   if (typeof module === 'object' && module.exports) module.exports = API;
   root.OCGSH = API;
@@ -2201,6 +3833,7 @@ details[open] summary::before { content: "\2212 "; }
   'use strict';
   var C = window.OCG, SH = window.OCGSH;
   var SETS = window.OCGSETS, FMT = window.OCGFMT;
+  var SCALE = window.OCGSCALE, CFG = window.OCGSET, ENC = window.OCGENC;
   var $ = function (id) { return document.getElementById(id); };
   var clamp = function (v, a, b) { return v < a ? a : (v > b ? b : v); };
 
@@ -2214,9 +3847,17 @@ details[open] summary::before { content: "\2212 "; }
     freq: 1, phase: 0,
     cycling: false, cycleSpeed: 0.12,
     animTime: false, timeSpeed: 1, time: 0,
+    defs: [], defAsts: [], graphIndex: 0, useLibrary: false,
+    recurseDepth: 4, recurseSeed: 0, params: {}, paramNames: [],
+    history: [],
+    freqMode: 0, cycleReverse: false,
+    gridAlpha: 1, boldAxes: true, reticle: false, scaleNote: false,
+    autoSpeed: 1, autoDir: 0, autoToCursor: true, flickZoom: true,
+    postKernel: 0, postKernelAmt: 0.5, postDither: 1, postDitherAmt: 1,
+    postLevels: 1, postGrain: 0, postScan: 0, postVignette: 0,
     lines: false, lineW: 1.6, parity: false, set: 0, setN: 2,
     hiOn: false, hiVal: 0,
-    aa: true, repair: true, cont: 1, markCont: true,
+    aa: false, repair: true, cont: 1, markCont: true,
     ss: 1, grid: true,
     backendPref: 'auto',
     voidRGB: [0.055, 0.065, 0.086]
@@ -2243,6 +3884,8 @@ details[open] summary::before { content: "\2212 "; }
     var vao = gl.createVertexArray();
     var fieldProg = null, colorProg = null, singleProg = null;
     var tex = null, fbo = null, texW = 0, texH = 0;
+    var postProg = null, colTex = null, colFbo = null, colW = 0, colH = 0;
+    var tileOx = 0, tileOy = 0, fullW = 0, fullH = 0;
     var statusNote = floatRT ? '' : 'no float targets \u2014 single pass';
 
     function compile(type, src) {
@@ -2290,7 +3933,16 @@ details[open] summary::before { content: "\2212 "; }
       schedule();
     });
 
+    var curG = null;
+    function setParams(u) {
+      if (!curG || !curG.params) return;
+      for (var i = 0; i < curG.params.length; i++) {
+        var n = curG.params[i];
+        u1f(u['p_' + n], S.params[n] || 0);
+      }
+    }
     function setExpr(glslSrc) {
+      if (glslSrc && typeof glslSrc === 'object') curG = glslSrc;
       lastSrc = glslSrc;
       var np;
       if (floatRT) {
@@ -2302,6 +3954,49 @@ details[open] summary::before { content: "\2212 "; }
         if (singleProg) gl.deleteProgram(singleProg.p);
         singleProg = np;
       }
+    }
+
+    /* A second colour target, only allocated when a filter actually needs it. */
+    function ensureColourTarget(w, h) {
+      if (colTex && colW === w && colH === h) return true;
+      if (colTex) { gl.deleteTexture(colTex); gl.deleteFramebuffer(colFbo); colTex = null; }
+      colW = w; colH = h;
+      colTex = gl.createTexture();
+      gl.bindTexture(gl.TEXTURE_2D, colTex);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, w, h, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+      colFbo = gl.createFramebuffer();
+      gl.bindFramebuffer(gl.FRAMEBUFFER, colFbo);
+      gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, colTex, 0);
+      var ok = gl.checkFramebufferStatus(gl.FRAMEBUFFER) === gl.FRAMEBUFFER_COMPLETE;
+      gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+      if (!ok) { gl.deleteTexture(colTex); colTex = null; return false; }
+      if (!postProg) postProg = link(SH.VS, SH.buildPostFS());
+      return true;
+    }
+
+    function runPost(w, h) {
+      var u = postProg.u;
+      gl.useProgram(postProg.p);
+      gl.activeTexture(gl.TEXTURE0);
+      gl.bindTexture(gl.TEXTURE_2D, colTex);
+      u1i(u.uImage, 0);
+      u2f(u.uTexel, 1 / w, 1 / h);
+      u2f(u.uOrigin, tileOx, tileOy);
+      u2f(u.uSize, fullW || w, fullH || h);
+      u1i(u.uKernel, S.postKernel);
+      u1i(u.uDither, S.postDither);
+      u1i(u.uLevels, S.postLevels);
+      u1f(u.uKernelAmt, S.postKernelAmt);
+      u1f(u.uDitherAmt, S.postDitherAmt);
+      u1f(u.uGrain, S.postGrain);
+      u1f(u.uScan, S.postScan);
+      u1f(u.uVignette, S.postVignette);
+      u1f(u.uSeed, 0);
+      gl.drawArrays(gl.TRIANGLES, 0, 3);
     }
 
     /* ensureTarget can demote us to single-pass after the fact. */
@@ -2348,8 +4043,15 @@ details[open] summary::before { content: "\2212 "; }
     }
 
     function fieldUniforms(u, ss) {
+      setParams(u);
+      /* The shader centres the world on uSize, so that has to be the size of
+         the WHOLE image, not of the tile being drawn. uOrigin shifts this
+         tile into place, and both live in field-texture pixels, so both are
+         scaled by the sample count. */
+      var imgW = (fullW || cv.width) * ss, imgH = (fullH || cv.height) * ss;
+      u2f(u.uOrigin, tileOx * ss, tileOy * ss);
       u2f(u.uCenter, S.cx, S.cy);
-      u2f(u.uSize, cv.width * ss, cv.height * ss);
+      u2f(u.uSize, imgW, imgH);
       u1f(u.uUPP, 1 / (S.ppu * dpr * ss));
       u1f(u.uTime, S.time);
       u1i(u.uCont, S.cont);
@@ -2357,7 +4059,7 @@ details[open] summary::before { content: "\2212 "; }
     }
     function shadeUniforms(u, ss) {
       var A = hexRGB(S.colA), B = hexRGB(S.colB);
-      var mean = C.paletteMean(S.palette, A, B, S.bands);
+      var mean = paletteMean();
       u1i(u.uPalette, S.palette);
       u1i(u.uBands, S.bands);
       u1i(u.uLines, S.lines ? 1 : 0);
@@ -2370,7 +4072,7 @@ details[open] summary::before { content: "\2212 "; }
       u1i(u.uAA, S.aa ? 1 : 0);
       u1i(u.uContTint, S.cont !== 0 && S.markCont ? 1 : 0);
       u1f(u.uPhase, S.phase);
-      u1f(u.uFreq, S.freq);
+      u1f(u.uFreq, effFreq());
       u1f(u.uLineW, S.lineW);
       u1f(u.uLineAmt, 1);
       u3f(u.uColA, A[0], A[1], A[2]);
@@ -2408,7 +4110,10 @@ details[open] summary::before { content: "\2212 "; }
       present: function () {
         if (lost || !ensurePrograms()) return;
         gl.bindVertexArray(vao);
-        gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+        /* With a filter on, colour goes to a texture first and the post pass
+           writes the visible frame. */
+        var wantPost = postActive() && ensureColourTarget(cv.width, cv.height);
+        gl.bindFramebuffer(gl.FRAMEBUFFER, wantPost ? colFbo : null);
         gl.viewport(0, 0, cv.width, cv.height);
         if (floatRT) {
           gl.useProgram(colorProg.p);
@@ -2422,6 +4127,14 @@ details[open] summary::before { content: "\2212 "; }
           shadeUniforms(singleProg.u, curSS);
         }
         gl.drawArrays(gl.TRIANGLES, 0, 3);
+        if (wantPost) {
+          gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+          gl.viewport(0, 0, cv.width, cv.height);
+          runPost(cv.width, cv.height);
+        }
+      },
+      setTile: function (ox, oy, fw, fh) {
+        tileOx = ox; tileOy = oy; fullW = fw; fullH = fh;
       },
       readPixels: function () {
         var w = cv.width, h = cv.height;
@@ -2443,6 +4156,7 @@ details[open] summary::before { content: "\2212 "; }
   function createCPU(cv) {
     var ctx = cv.getContext('2d');
     var buf = null, flags = null, bw = 0, bh = 0;
+    var ctileX = 0, ctileY = 0, cfullW = 0, cfullH = 0;
     var off = document.createElement('canvas');
     var offCtx = off.getContext('2d');
     var img = null;
@@ -2461,18 +4175,21 @@ details[open] summary::before { content: "\2212 "; }
       var h = Math.max(1, Math.round(cv.height * k));
       alloc(w, h);
       var upp = 1 / (S.ppu * dpr * k);
+      /* Same rule as the GPU: centre on the full image, offset by the tile. */
+      var imgW = (cfullW || cv.width) * k, imgH = (cfullH || cv.height) * k;
+      var offX = ctileX * k, offY = ctileY * k;
       var f = S.fn, RT = C.RT;
       RT.mode = S.cont;
       var repair = S.repair;
       for (var j = 0; j < h; j++) {
-        var gy = (h - 1 - j) + 0.5 - h * 0.5;
+        var gy = (h - 1 - j) + offY + 0.5 - imgH * 0.5;
         var wy = S.cy + gy * upp;
         var row = j * w;
         for (var i = 0; i < w; i++) {
-          var wx = S.cx + (i + 0.5 - w * 0.5) * upp;
+          var wx = S.cx + (i + offX + 0.5 - imgW * 0.5) * upp;
           RT.cont = 0; RT.pole = 0;
           var v = f(wx, wy, S.time, Math.sqrt(wx * wx + wy * wy),
-            (wx === 0 && wy === 0) ? 0 : Math.atan2(wy, wx));
+            (wx === 0 && wy === 0) ? 0 : Math.atan2(wy, wx), S.params);
           var fl = (RT.cont ? 1 : 0) | (RT.pole ? 2 : 0);
           if (C.bad(v) && repair) {
             var s = 0, n = 0, lo = Infinity, hi = -Infinity;
@@ -2482,7 +4199,7 @@ details[open] summary::before { content: "\2212 "; }
               var px = wx + ox, py = wy + oy;
               RT.cont = 0; RT.pole = 0;
               var q = f(px, py, S.time, Math.sqrt(px * px + py * py),
-                (px === 0 && py === 0) ? 0 : Math.atan2(py, px));
+                (px === 0 && py === 0) ? 0 : Math.atan2(py, px), S.params);
               if (!C.bad(q)) { s += q; n++; if (q < lo) lo = q; if (q > hi) hi = q; }
             }
             if (n >= 2 && (hi - lo) < 1) { v = s / n; fl = 1; }
@@ -2495,24 +4212,15 @@ details[open] summary::before { content: "\2212 "; }
       return k;
     }
 
-    /* Palette lookup table — avoids allocating an array per pixel. */
-    var LUT_N = 1024, lut = new Float32Array(LUT_N * 3);
-    function buildLUT(A, B) {
-      for (var i = 0; i < LUT_N; i++) {
-        var c = C.paletteRGB(S.palette, (i + 0.5) / LUT_N, A, B, S.bands);
-        lut[i * 3] = c[0]; lut[i * 3 + 1] = c[1]; lut[i * 3 + 2] = c[2];
-      }
-    }
 
     /* Mirror of the GLSL shade() function. */
     function colorize(k) {
       var w = bw, h = bh, data = img.data;
-      var A = hexRGB(S.colA), B = hexRGB(S.colB);
-      var mean = C.paletteMean(S.palette, A, B, S.bands);
-      buildLUT(A, B);
+      var mean = paletteMean();
+      var lut = paletteLUT();
       var m0 = mean[0], m1 = mean[1], m2 = mean[2];
       var vr0 = S.voidRGB[0] * 255, vr1 = S.voidRGB[1] * 255, vr2 = S.voidRGB[2] * 255;
-      var ssf = k, freq = S.freq, phase = S.phase, BG = C.BIG;
+      var ssf = k, freq = effFreq(), phase = S.phase, BG = C.BIG;
       var lines = S.lines, hw = S.lineW * 0.5 * ssf, parity = S.parity;
       var setKind = S.set, setN = S.setN, hiOn = S.lines && S.hiOn;
       var parityOK = SETS.SETS[setKind].parity;
@@ -2567,6 +4275,7 @@ details[open] summary::before { content: "\2212 "; }
           data[o] = cr * 255; data[o + 1] = cg * 255; data[o + 2] = cb * 255; data[o + 3] = 255;
         }
       }
+      applyPost(data, w, h);
       offCtx.putImageData(img, 0, 0);
       ctx.imageSmoothingEnabled = k > 1;
       ctx.clearRect(0, 0, cv.width, cv.height);
@@ -2578,12 +4287,86 @@ details[open] summary::before { content: "\2212 "; }
       kind: 'cpu',
       getNote: function () { return ''; },
       setExpr: function () { },
+      setTile: function (ox, oy, fw, fh) {
+        ctileX = ox; ctileY = oy; cfullW = fw; cfullH = fh;
+      },
       resize: function () { },
       renderField: function () { lastK = evalField(cpuScale()); },
       present: function () { if (buf) colorize(lastK); },
       readPixels: null,
       destroy: function () { }
     };
+  }
+
+  /* ------------------------------------------- CPU post-processing */
+  /* Same order of operations as the post shader: kernel, dither, posterise,
+     scanlines, grain, vignette. */
+  var BAYER4 = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5];
+  var postScratch = null;
+  function bayer(x, y, size) {
+    if (size === 4) return BAYER4[(y & 3) * 4 + (x & 3)] / 16 - 0.5;
+    var a = BAYER4[(y & 3) * 4 + (x & 3)] / 16;
+    var b = BAYER4[((y >> 1) & 3) * 4 + ((x >> 1) & 3)] / 16;
+    return (a * 0.25 + b) - 0.5;
+  }
+  function hash2(x, y) {
+    var v = Math.sin(x * 12.9898 + y * 78.233) * 43758.5453;
+    return v - Math.floor(v);
+  }
+  function applyPost(data, w, h) {
+    if (!postActive()) return;
+    var k = S.postKernel, amt = S.postKernelAmt;
+    if (k !== 0 && amt > 0) {
+      if (!postScratch || postScratch.length !== data.length) {
+        postScratch = new Uint8ClampedArray(data.length);
+      }
+      postScratch.set(data);
+      var src = postScratch;
+      var at = function (xx, yy, c) {
+        xx = xx < 0 ? 0 : (xx >= w ? w - 1 : xx);
+        yy = yy < 0 ? 0 : (yy >= h ? h - 1 : yy);
+        return src[(yy * w + xx) * 4 + c];
+      };
+      for (var y = 0; y < h; y++) {
+        for (var x = 0; x < w; x++) {
+          var o = (y * w + x) * 4;
+          for (var c = 0; c < 3; c++) {
+            var mid = src[o + c];
+            var n = at(x, y + 1, c), s2 = at(x, y - 1, c);
+            var e = at(x + 1, y, c), wv = at(x - 1, y, c), out;
+            if (k === 1) out = mid * 5 - (n + s2 + e + wv);
+            else if (k === 2) out = (mid + n + s2 + e + wv) * 0.2;
+            else if (k === 3) out = Math.abs(e - wv) + Math.abs(n - s2);
+            else out = (mid - at(x - 1, y - 1, c)) + 128;
+            data[o + c] = mid + (clamp(out, 0, 255) - mid) * amt;
+          }
+        }
+      }
+    }
+    var levels = S.postLevels, dm = S.postDither, damt = S.postDitherAmt;
+    var grain = S.postGrain, scan = S.postScan, vig = S.postVignette;
+    var needsPixelPass = levels > 1 || grain > 0 || scan > 0 || vig > 0;
+    if (!needsPixelPass) return;
+    for (var yy2 = 0; yy2 < h; yy2++) {
+      var scanF = scan > 0 ? 1 - scan * (0.5 + 0.5 * Math.cos(yy2 * Math.PI)) : 1;
+      for (var xx2 = 0; xx2 < w; xx2++) {
+        var oo = (yy2 * w + xx2) * 4;
+        var vx = xx2 / Math.max(1, w) - 0.5, vy = yy2 / Math.max(1, h) - 0.5;
+        var vigF = vig > 0 ? 1 - vig * clamp((vx * vx + vy * vy) * 2.2, 0, 1) : 1;
+        var d = 0;
+        if (dm !== 0 && levels > 1) {
+          d = dm === 3 ? hash2(xx2, yy2) - 0.5 : bayer(xx2, yy2, dm === 1 ? 4 : 8);
+          d = d * damt / levels;
+        }
+        var g2 = grain > 0 ? (hash2(xx2 * 1.7, yy2 * 1.7) - 0.5) * grain : 0;
+        for (var ch = 0; ch < 3; ch++) {
+          var val = data[oo + ch] / 255 + d;
+          if (levels > 1) val = Math.floor(clamp(val, 0, 1) * levels + 0.5) / levels;
+          val = val * scanF * vigF + g2;
+          data[oo + ch] = clamp(val, 0, 1) * 255;
+        }
+      }
+    }
   }
 
   /* JS twins of rgb2hsl / negativeOf / lineColour in the shader. */
@@ -2624,6 +4407,30 @@ details[open] summary::before { content: "\2212 "; }
     return out;
   }
 
+  /* mode 0: the colour period is fixed in the plane, so zooming in widens
+     the bands on screen. mode 1: the period tracks the zoom, holding the
+     on-screen width. mode 2: it tracks the square of the zoom, so bands get
+     finer the further in you go, the mirror image of mode 0. */
+  var FREQ_REF_SPAN = 800 / 84;          // the default view, in world units
+  /* Driven by the visible span rather than by pixels-per-unit, so rendering
+     the same view at a larger size bands identically. An export widens the
+     canvas and the scale together, leaving the span - and so the banding -
+     untouched. */
+  function effFreq() {
+    var m = S.freqMode | 0;
+    if (!m) return S.freq;
+    var span = Wc / S.ppu;
+    if (!(span > 0)) return S.freq;
+    return clamp(S.freq * Math.pow(FREQ_REF_SPAN / span, m), 1e-6, 1e12);
+  }
+  /* Width of one colour band in CSS pixels, which is what the readout shows
+     and what the tests check. */
+  function bandPixels() { return S.ppu / effFreq(); }
+  function postActive() {
+    return S.postKernel !== 0 || S.postLevels > 1 || S.postGrain > 0 ||
+      S.postScan > 0 || S.postVignette > 0;
+  }
+
   function smooth(e0, e1, x) {
     var s = clamp((x - e0) / (e1 - e0), 0, 1);
     return s * s * (3 - 2 * s);
@@ -2632,6 +4439,39 @@ details[open] summary::before { content: "\2212 "; }
     if (interacting) return 0.4;
     return S.ss >= 2 ? 2 : 1;
   }
+  /* The mean is a 96-sample sweep of the ramp and it only changes when the
+     theme does, so it is worth remembering between frames. */
+  var meanCache = { key: '', v: [0.5, 0.5, 0.5] };
+  function paletteMean() {
+    var A = hexRGB(S.colA), B = hexRGB(S.colB);
+    var key = S.palette + '|' + S.colA + '|' + S.colB + '|' + S.bands;
+    if (meanCache.key !== key) {
+      meanCache.key = key;
+      meanCache.v = C.paletteMean(S.palette, A, B, S.bands);
+    }
+    return meanCache.v;
+  }
+
+  /* The ramp is sampled once per theme, not once per frame: rebuilding it
+     every frame cost 1024 palette evaluations and as many temporary arrays
+     while the colours were rotating. */
+  var LUT_N = 1024;
+  var lutCache = { key: '', v: new Float32Array(LUT_N * 3) };
+  function paletteLUT() {
+    var key = S.palette + '|' + S.colA + '|' + S.colB + '|' + S.bands;
+    if (lutCache.key !== key) {
+      var A = hexRGB(S.colA), B = hexRGB(S.colB);
+      for (var i = 0; i < LUT_N; i++) {
+        var c = C.paletteRGB(S.palette, (i + 0.5) / LUT_N, A, B, S.bands);
+        lutCache.v[i * 3] = c[0];
+        lutCache.v[i * 3 + 1] = c[1];
+        lutCache.v[i * 3 + 2] = c[2];
+      }
+      lutCache.key = key;
+    }
+    return lutCache.v;
+  }
+
   function hexRGB(hex) {
     var n = parseInt(hex.slice(1), 16);
     return [((n >> 16) & 255) / 255, ((n >> 8) & 255) / 255, (n & 255) / 255];
@@ -2654,6 +4494,7 @@ details[open] summary::before { content: "\2212 "; }
 
   function wantGPU() {
     if (S.backendPref === 'cpu') return false;
+    if (S.backendPref === 'hybrid') return gpuSupported && Date.now() >= gpuBlockedUntil;
     if (Date.now() < gpuBlockedUntil) return false;
     if (!gpuSupported) return false;
     if (S.backendPref === 'gpu') return true;
@@ -2664,6 +4505,7 @@ details[open] summary::before { content: "\2212 "; }
   function backendReason() {
     if (backend !== 'cpu') return '';
     if (S.backendPref === 'cpu') return 'your choice';
+    if (S.backendPref === 'hybrid') return 'hybrid fallback';
     if (!gpuSupported) return 'no WebGL2';
     if (Date.now() < gpuBlockedUntil) return 'GPU recovering';
     if (precisionStrained()) return 'past GPU precision';
@@ -2706,19 +4548,102 @@ details[open] summary::before { content: "\2212 "; }
   /* ==================================================================== */
   /*  Expression handling                                                 */
   /* ==================================================================== */
+  /* ------------------------------------------------- free variables */
+  /* Any bare name the language does not claim becomes a parameter with its
+     own slider. Values survive an edit, so tweaking a formula does not reset
+     the dials you have already set. */
+  function syncParams(names) {
+    S.paramNames = names.slice();
+    names.forEach(function (n) {
+      if (typeof S.params[n] !== 'number') S.params[n] = 1;
+    });
+    renderParamRows();
+  }
+
+  function renderParamRows() {
+    var host2 = $('paramRows');
+    if (!host2) return;
+    $('paramSection').style.display = S.paramNames.length ? '' : 'none';
+    host2.textContent = '';
+    S.paramNames.forEach(function (name) {
+      var row = document.createElement('div');
+      row.className = 'paramRow';
+      var lab = document.createElement('span');
+      lab.className = 'pname'; lab.textContent = name; lab.title = name;
+      var rng = document.createElement('input');
+      rng.type = 'range'; rng.className = 'grow';
+      rng.min = '-10'; rng.max = '10'; rng.step = '0.01';
+      rng.value = String(S.params[name]);
+      var num = document.createElement('input');
+      num.type = 'number'; num.className = 'num';
+      num.step = '0.1'; num.value = String(S.params[name]);
+      function set(v, from) {
+        if (!isFinite(v)) return;
+        S.params[name] = v;
+        if (from !== 'r') rng.value = String(clamp(v, -10, 10));
+        if (from !== 'n') num.value = String(v);
+        fieldDirty = presentDirty = true;
+        schedule();
+      }
+      rng.addEventListener('input', function () { set(parseFloat(this.value), 'r'); });
+      num.addEventListener('input', function () { set(parseFloat(this.value), 'n'); });
+      row.appendChild(lab); row.appendChild(rng); row.appendChild(num);
+      host2.appendChild(row);
+    });
+  }
+
+  /* --------------------------------------------------------- history */
+  function isPreset(src) {
+    var want = canon(src);
+    for (var i = 0; i < C.PRESETS.length; i++) {
+      var items = C.PRESETS[i].items;
+      for (var j = 0; j < items.length; j++) if (canon(items[j].expr) === want) return true;
+    }
+    return false;
+  }
+
+  /* Only formulas that parsed and are not already a template are worth
+     keeping; most recent first, no duplicates. */
+  function rememberExpression(src) {
+    var text = String(src).trim();
+    if (!text || isPreset(text)) return;
+    var want = canon(text);
+    S.history = S.history.filter(function (h) { return canon(h) !== want; });
+    S.history.unshift(text);
+    if (S.history.length > 60) S.history.length = 60;
+  }
+
+  /* Definitions are re-parsed as a set, so an error in one is reported
+     against that entry rather than poisoning the whole library. */
+  function rebuildDefs() {
+    var errs = [];
+    S.defAsts = S.defs.map(function (text, i) {
+      try { return C.parseDefinition(text); }
+      catch (e) { errs.push({ i: i, msg: e.message }); return null; }
+    }).filter(Boolean);
+    return errs;
+  }
+
   function applyExpression(src, silent) {
     var errEl = $('exprErr');
     try {
       var ast = C.parse(src);
-      var info = C.analyze(ast);
-      var glsl = C.emitGLSL(ast).src;
-      S.ast = ast; S.info = info; S.expr = src; S.glsl = glsl; S.error = null;
-      S.fn = C.compileJS(ast);
+      /* flatten every f(...) reference into one tree before code generation */
+      var linked = C.link(ast, S.defAsts, {
+        depth: S.recurseDepth, seed: S.recurseSeed
+      });
+      var flat = linked.ast;
+      var info = C.analyze(flat);
+      var g = C.emitGLSL(flat);
+      S.ast = ast; S.flat = flat; S.info = info; S.expr = src;
+      S.glsl = g; S.recursed = linked.recursed; S.error = null;
+      S.fn = C.compileJS(flat);
+      syncParams(g.params);
       errEl.textContent = '';
       errEl.classList.remove('on');
       $('exprField').classList.remove('bad');
-      if (backend === 'gpu') {
-        try { R.setExpr(glsl); }
+      if (R && R.setExpr) {
+        try { R.setExpr(g); }
         catch (err) {
           note('That expression did not compile on the GPU. Drawing it on the CPU.');
           gpuBlockedUntil = Date.now() + 20000;
@@ -2726,7 +4651,9 @@ details[open] summary::before { content: "\2212 "; }
         }
       }
       $('timeRow').style.display = info.usesTime ? '' : 'none';
-      updatePreview(ast);
+      $('recurseSection').style.display = linked.recursed ? '' : 'none';
+      updatePreview(ast, flat);
+      rememberExpression(src);
       fieldDirty = presentDirty = true;
       schedule();
       return true;
@@ -2743,17 +4670,24 @@ details[open] summary::before { content: "\2212 "; }
      guessed: x^2 - y shows y outside the exponent, x^(2-y) shows it inside.
      MathML renders natively, which keeps the page dependency-free. */
   var previewTeX = false;
-  function updatePreview(ast) {
+  function updatePreview(ast, flat) {
     var box = $('previewMath'), plain = $('previewPlain');
     if (!box || !ast) return;
     if (previewTeX) {
       box.textContent = FMT.latex(ast);
       box.className = 'tex';
       plain.textContent = 'LaTeX \u2014 click to go back';
-    } else {
-      box.innerHTML = FMT.mathml(ast);
-      box.className = '';
-      plain.textContent = FMT.canonical(ast);
+      return;
+    }
+    box.innerHTML = FMT.mathml(ast);
+    box.className = '';
+    var typed = FMT.canonical(ast);
+    plain.textContent = typed;
+    /* when the expression calls your own functions, also show what it
+       becomes once those are unwound, since that is what gets drawn */
+    if (flat) {
+      var unwound = FMT.canonical(flat);
+      if (unwound !== typed) plain.textContent = typed + '\n= ' + unwound;
     }
   }
 
@@ -2761,7 +4695,7 @@ details[open] summary::before { content: "\2212 "; }
     if (!S.fn) return null;
     C.RT.mode = S.cont; C.RT.cont = 0; C.RT.pole = 0;
     var v = S.fn(x, y, S.time, Math.sqrt(x * x + y * y),
-      (x === 0 && y === 0) ? 0 : Math.atan2(y, x));
+      (x === 0 && y === 0) ? 0 : Math.atan2(y, x), S.params);
     return { v: v, cont: C.RT.cont, pole: C.RT.pole };
   }
 
@@ -2801,6 +4735,38 @@ details[open] summary::before { content: "\2212 "; }
     schedule();
     updateReadout();
   }
+  /* -------------------------------------------------------- auto zoom */
+  /* Runs at a constant number of doublings per second, so the motion looks
+     even however deep it goes. */
+  var autoTarget = null;
+  function startAuto(dir, at) {
+    S.autoDir = dir;
+    autoTarget = at || (S.autoToCursor && cursor ? { x: cursor.x, y: cursor.y } : null);
+    lastT = performance.now();
+    updateAutoButtons();
+    updateReadout();
+    schedule();
+  }
+  function stopAuto() {
+    if (!S.autoDir) return;
+    S.autoDir = 0;
+    autoTarget = null;
+    updateAutoButtons();
+    updateReadout();
+  }
+  function updateAutoButtons() {
+    var i = $('autoIn'), o = $('autoOut');
+    if (i) i.classList.toggle('on', S.autoDir > 0);
+    if (o) o.classList.toggle('on', S.autoDir < 0);
+  }
+  function stepAuto(dt) {
+    if (!S.autoDir) return;
+    var f = Math.pow(2, S.autoDir * S.autoSpeed * dt);
+    var at = autoTarget || { x: Wc / 2, y: Hc / 2 };
+    zoomAt(at.x, at.y, f);
+    if (S.ppu > 1e17 || S.ppu < 1e-11) stopAuto();
+  }
+
   function resetView(usePreset) {
     var p = currentPreset();
     S.cx = 0; S.cy = 0;
@@ -2839,46 +4805,36 @@ details[open] summary::before { content: "\2212 "; }
     var m = n < 1.5 ? 1 : (n < 3.5 ? 2 : (n < 7.5 ? 5 : 10));
     return m * mag;
   }
-  function fmt(v, step) {
-    if (v === 0) return '0';
-    var dec = Math.max(0, -Math.floor(Math.log10(step)) + 1);
-    if (Math.abs(v) >= 1e6 || Math.abs(v) < 1e-5) return v.toExponential(2);
-    return v.toFixed(Math.min(dec, 8)).replace(/\.?0+$/, '');
+  function esc(t) {
+    return String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
   }
+  /* Trailing zeros may only be stripped after a decimal point: an optional
+     dot in the pattern turned 100 into 1, so every gridline past step 10 was
+     mislabelled. */
+  function stripZeros(str) {
+    if (str.indexOf('.') < 0) return str;
+    return str.replace(/0+$/, '').replace(/\.$/, '');
+  }
+  function fmt(v, step) {
+    if (!isFinite(v)) return v > 0 ? '\u221e' : (v < 0 ? '-\u221e' : '\u2014');
+    if (v === 0) return '0';
+    var a = Math.abs(v);
+    if (a >= 1e7 || a < 1e-6) {
+      var e = v.toExponential(2).split('e');
+      return stripZeros(e[0]) + 'e' + e[1];
+    }
+    var st = (isFinite(step) && step > 0) ? step : a / 100;
+    var dec = Math.max(0, -Math.floor(Math.log10(st)) + 1);
+    return stripZeros(v.toFixed(Math.min(dec, 12)));
+  }
+
   function drawOverlay() {
     var g = overlay.getContext('2d');
     g.setTransform(1, 0, 0, 1, 0, 0);
     g.clearRect(0, 0, overlay.width, overlay.height);
     g.scale(dpr, dpr);
-    if (S.grid) {
-      var span = Wc / S.ppu;
-      var step = niceStep(span);
-      var x0 = Math.ceil((S.cx - Wc / 2 / S.ppu) / step) * step;
-      var y0 = Math.ceil((S.cy - Hc / 2 / S.ppu) / step) * step;
-      g.lineWidth = 1;
-      g.font = '10px ui-monospace, monospace';
-      g.textBaseline = 'top';
-      for (var x = x0; x <= S.cx + Wc / 2 / S.ppu; x += step) {
-        var px = Math.round((x - S.cx) * S.ppu + Wc / 2) + 0.5;
-        var axis = Math.abs(x) < step * 1e-6;
-        g.strokeStyle = axis ? 'rgba(255,255,255,0.55)' : 'rgba(255,255,255,0.13)';
-        g.beginPath(); g.moveTo(px, 0); g.lineTo(px, Hc); g.stroke();
-        if (!axis) {
-          g.fillStyle = 'rgba(255,255,255,0.5)';
-          g.fillText(fmt(x, step), px + 3, Hc - 14);
-        }
-      }
-      for (var y = y0; y <= S.cy + Hc / 2 / S.ppu; y += step) {
-        var py = Math.round(Hc / 2 - (y - S.cy) * S.ppu) + 0.5;
-        var ax2 = Math.abs(y) < step * 1e-6;
-        g.strokeStyle = ax2 ? 'rgba(255,255,255,0.55)' : 'rgba(255,255,255,0.13)';
-        g.beginPath(); g.moveTo(0, py); g.lineTo(Wc, py); g.stroke();
-        if (!ax2) {
-          g.fillStyle = 'rgba(255,255,255,0.5)';
-          g.fillText(fmt(y, step), 4, py + 3);
-        }
-      }
-    }
+    if (S.grid) drawGrid(g, Wc, Hc, 1);
+    if (S.reticle && cursor && !band) drawReticle(g, cursor.x, cursor.y);
     if (band) {
       var bx = Math.min(band.x0, band.x1), by = Math.min(band.y0, band.y1);
       var bw = Math.abs(band.x1 - band.x0), bh = Math.abs(band.y1 - band.y0);
@@ -2890,6 +4846,131 @@ details[open] summary::before { content: "\2212 "; }
     }
   }
 
+  /* Drawn at an arbitrary size so the same code serves the screen and a
+     high-resolution export. */
+  /* k scales line weights and text only; S.ppu already carries the geometry,
+     so folding k into it as well would draw the grid at the wrong spacing. */
+  /* Labels sit against the axis they measure, not against the window edge.
+     Pinned to the edges they read as belonging to whichever line happens to
+     be nearby; against their own axis, with a tick and a dark halo, each
+     number plainly names its own line. */
+  function drawGrid(g, w, h, k) {
+    var ppu = S.ppu;
+    var halfW = w / 2 / ppu, halfH = h / 2 / ppu;
+    var step = niceStep(w / ppu);
+    if (!isFinite(step) || step <= 0) return;
+
+    var minor = 'rgba(255,255,255,' + S.gridAlpha.toFixed(3) + ')';
+    var axisA = Math.min(1, S.gridAlpha * 0.7 + 0.3);
+    var axisCol = 'rgba(255,255,255,' + axisA.toFixed(3) + ')';
+    var fontPx = Math.round(10 * k);
+    g.font = fontPx + 'px ui-monospace, monospace';
+    g.textBaseline = 'top';
+
+    var n0 = Math.ceil((S.cx - halfW) / step);
+    var n1 = Math.floor((S.cx + halfW) / step);
+    var m0 = Math.ceil((S.cy - halfH) / step);
+    var m1 = Math.floor((S.cy + halfH) / step);
+    if (n1 - n0 > 4000 || m1 - m0 > 4000) return;      // nothing legible here
+
+    /* where the two axes fall, clamped so labels stay on the canvas */
+    var axisPx = (0 - S.cx) * ppu + w / 2;
+    var axisPy = h / 2 - (0 - S.cy) * ppu;
+    var rowY = clamp(axisPy + 4 * k, 2 * k, h - fontPx - 3 * k);
+    var colX = clamp(axisPx + 5 * k, 3 * k, w - 4 * k);
+    var tick = 4 * k;
+
+    /* The face is monospace, so the advance is a fixed fraction of the size:
+       cheaper than measuring, and exact enough to clamp against an edge. */
+    var charW = fontPx * 0.6;
+    function label(text, tx, ty, right) {
+      var wid = text.length * charW;
+      var x = right ? Math.min(tx, w - wid - 2 * k) : tx;
+      g.lineJoin = 'round';
+      g.lineWidth = 3 * k;
+      g.strokeStyle = 'rgba(8,11,17,0.85)';
+      g.strokeText(text, x, ty);
+      g.fillStyle = 'rgba(255,255,255,0.92)';
+      g.fillText(text, x, ty);
+    }
+
+    var n, v, px, py, isAxis;
+
+    /* vertical lines, labelled with their x value */
+    for (n = n0; n <= n1; n++) {
+      v = n * step;
+      px = Math.round((v - S.cx) * ppu + w / 2) + 0.5;
+      isAxis = (n === 0);
+      g.strokeStyle = isAxis ? axisCol : minor;
+      g.lineWidth = (isAxis && S.boldAxes) ? 2 * k : 1 * k;
+      g.beginPath(); g.moveTo(px, 0); g.lineTo(px, h); g.stroke();
+    }
+    /* horizontal lines, labelled with their y value */
+    for (n = m0; n <= m1; n++) {
+      v = n * step;
+      py = Math.round(h / 2 - (v - S.cy) * ppu) + 0.5;
+      isAxis = (n === 0);
+      g.strokeStyle = isAxis ? axisCol : minor;
+      g.lineWidth = (isAxis && S.boldAxes) ? 2 * k : 1 * k;
+      g.beginPath(); g.moveTo(0, py); g.lineTo(w, py); g.stroke();
+    }
+
+    if (S.gridAlpha <= 0.02 && !S.boldAxes) return;    // lines only
+
+    /* ticks and numbers on top, so the grid never draws over them */
+    g.strokeStyle = 'rgba(255,255,255,' + axisA.toFixed(3) + ')';
+    g.lineWidth = 1 * k;
+    for (n = n0; n <= n1; n++) {
+      if (n === 0) continue;                            // the origin is named once
+      v = n * step;
+      px = Math.round((v - S.cx) * ppu + w / 2) + 0.5;
+      g.beginPath(); g.moveTo(px, rowY - tick); g.lineTo(px, rowY - 1); g.stroke();
+      label(fmt(v, step), px + 3 * k, rowY, true);
+    }
+    for (n = m0; n <= m1; n++) {
+      if (n === 0) continue;
+      v = n * step;
+      py = Math.round(h / 2 - (v - S.cy) * ppu) + 0.5;
+      /* skip anything that would land on the row of x labels */
+      if (Math.abs(py - rowY) < fontPx) continue;
+      g.beginPath(); g.moveTo(colX - tick, py); g.lineTo(colX - 1, py); g.stroke();
+      label(fmt(v, step), colX, py - fontPx * 0.5, true);
+    }
+    /* one 0 at the origin, so the reference point is never missing */
+    if (n0 <= 0 && n1 >= 0 && m0 <= 0 && m1 >= 0) {
+      label('0', clamp(axisPx + 4 * k, 3 * k, w - 10 * k),
+        clamp(axisPy + 4 * k, 2 * k, h - fontPx - 3 * k), true);
+    }
+  }
+
+
+
+  /* Dark halo under a light core, so the reticle reads over any colour the
+     graph happens to put beneath it. */
+  function drawReticle(g, x, y) {
+    var arm = 9, gap = 3, ring = 13;
+    function strokeShape() {
+      g.beginPath();
+      g.moveTo(x - arm - gap, y); g.lineTo(x - gap, y);
+      g.moveTo(x + gap, y); g.lineTo(x + arm + gap, y);
+      g.moveTo(x, y - arm - gap); g.lineTo(x, y - gap);
+      g.moveTo(x, y + gap); g.lineTo(x, y + arm + gap);
+      g.stroke();
+      g.beginPath();
+      g.arc(x, y, ring, 0, Math.PI * 2);
+      g.stroke();
+    }
+    g.lineCap = 'round';
+    g.strokeStyle = 'rgba(0,0,0,0.75)';
+    g.lineWidth = 3.5;
+    strokeShape();
+    g.strokeStyle = 'rgba(255,255,255,0.95)';
+    g.lineWidth = 1.25;
+    strokeShape();
+    g.lineCap = 'butt';
+  }
+
+
   /* ==================================================================== */
   /*  Palette rail                                                        */
   /* ==================================================================== */
@@ -2899,14 +4980,21 @@ details[open] summary::before { content: "\2212 "; }
     var cssH = rail.clientHeight || 300;
     var w = Math.round(20 * scale), h = Math.max(1, Math.round(cssH * scale));
     rail.width = w; rail.height = h;
-    var A = hexRGB(S.colA), B = hexRGB(S.colB);
+    var lut = paletteLUT();
+    var img2 = g.createImageData(w, h);
+    var d2 = img2.data;
     for (var i = 0; i < h; i++) {
       var u = 1 - (i + 0.5) / h;              // 1 at the top, 0 at the bottom
       var uu = u + S.phase; uu -= Math.floor(uu);
-      var c = C.paletteRGB(S.palette, uu, A, B, S.bands);
-      g.fillStyle = 'rgb(' + (c[0] * 255 | 0) + ',' + (c[1] * 255 | 0) + ',' + (c[2] * 255 | 0) + ')';
-      g.fillRect(0, i, w, 1);
+      var li = (uu * LUT_N) | 0; if (li >= LUT_N) li = LUT_N - 1;
+      li *= 3;
+      var r8 = lut[li] * 255, g8 = lut[li + 1] * 255, b8 = lut[li + 2] * 255;
+      for (var col = 0; col < w; col++) {
+        var o = (i * w + col) * 4;
+        d2[o] = r8; d2[o + 1] = g8; d2[o + 2] = b8; d2[o + 3] = 255;
+      }
     }
+    g.putImageData(img2, 0, 0);
     /* The ramp repeats every 1/freq in z, so that is what the cap reports. */
     var top = $('railTop');
     if (top) {
@@ -2928,7 +5016,12 @@ details[open] summary::before { content: "\2212 "; }
     var dt = Math.min(0.1, (now - lastT) / 1000);
     lastT = now;
 
-    if (S.cycling) { S.phase = (S.phase + S.cycleSpeed * dt) % 1; presentDirty = true; syncPhaseUI(); }
+    if (S.autoDir) stepAuto(dt);
+    if (S.cycling) {
+      var dir = S.cycleReverse ? -1 : 1;
+      S.phase = (S.phase + dir * S.cycleSpeed * dt + 1) % 1;
+      presentDirty = true; syncPhaseUI();
+    }
     if (S.animTime && S.info && S.info.usesTime) {
       S.time += S.timeSpeed * dt;
       fieldDirty = presentDirty = true;
@@ -2943,11 +5036,14 @@ details[open] summary::before { content: "\2212 "; }
       /* The grid only moves when the view does, and the rail only needs to
          keep up with the eye — neither belongs in every rotation frame. */
       if (overlayDirty) { drawOverlay(); overlayDirty = false; }
+      cancelRefine();
       if (S.cycling && now - lastRail > 50) { drawRail(); lastRail = now; }
       if (!perfEl) perfEl = $('perf');
       perfEl.textContent = lastRenderMs.toFixed(1) + ' ms';
     }
-    if (S.cycling || (S.animTime && S.info && S.info.usesTime)) schedule();
+    if (refineJob) stepRefine(8);
+    if (S.cycling || S.autoDir || refineJob ||
+      (S.animTime && S.info && S.info.usesTime)) schedule();
   }
 
   var phasePair = null;
@@ -3010,22 +5106,46 @@ details[open] summary::before { content: "\2212 "; }
   function updateReadout() {
     var el = $('readout');
     var span = Wc / S.ppu;
-    var zoomTxt = 'span ' + fmt(span, span / 100) + '  \u00b7  ' + backend.toUpperCase();
+    var mag = S.ppu / 84;
+    var magTxt = mag >= 1e4 || mag < 1e-3 ? mag.toExponential(2) : mag.toPrecision(3);
+
+    var zEl = $('zoomVal'), sEl = $('spanVal');
+    if (zEl) zEl.textContent = magTxt + '\u00d7' + (S.autoDir ? '  auto' : '');
+    refreshBandInfo();
+    if (sEl) sEl.textContent = fmt(span, span / 100);
+
+    var noteBar = $('scaleNoteBar');
+    if (noteBar) {
+      if (S.scaleNote) {
+        noteBar.textContent = SCALE.note(span);
+        noteBar.classList.add('on');
+        document.body.classList.add('has-note');
+      } else {
+        noteBar.classList.remove('on');
+        document.body.classList.remove('has-note');
+      }
+    }
+
+    var tail = magTxt + '\u00d7  \u00b7  span ' + fmt(span, span / 100) +
+      '  \u00b7  ' + backend.toUpperCase();
     var n = (R && R.getNote ? R.getNote() : '') || backendReason();
-    if (n) zoomTxt += ' (' + n + ')';
-    if (!cursor) { el.innerHTML = '<span class="dim">' + zoomTxt + '</span>'; return; }
+    if (n) tail += ' (' + n + ')';
+    if (S.autoDir) tail += '  \u00b7  auto zoom';
+
+    if (!cursor) { el.innerHTML = '<span class="dim">' + esc(tail) + '</span>'; return; }
     var w = worldFromCss(cursor.x, cursor.y);
     var res = evalOne(w.x, w.y);
     var vTxt;
-    if (!res) vTxt = '—';
+    if (!res) vTxt = '\u2014';
     else if (C.bad(res.v)) vTxt = res.pole ? 'pole' : 'undefined';
     else vTxt = res.v.toFixed(6) + (res.cont ? ' *' : '');
     el.innerHTML =
-      '<b>x</b> ' + fmt(w.x, span / 1000) +
-      '   <b>y</b> ' + fmt(w.y, span / 1000) +
-      '   <b>z</b> ' + vTxt +
-      '<br><span class="dim">' + zoomTxt + '</span>';
+      '<b>x</b> ' + esc(fmt(w.x, span / 1000)) +
+      '   <b>y</b> ' + esc(fmt(w.y, span / 1000)) +
+      '   <b>z</b> ' + esc(vTxt) +
+      '<br><span class="dim">' + esc(tail) + '</span>';
   }
+
 
   /* ==================================================================== */
   /*  Pointer interaction                                                 */
@@ -3040,14 +5160,17 @@ details[open] summary::before { content: "\2212 "; }
   function markInteracting() {
     interacting = true;
     clearTimeout(idleTimer);
+    cancelRefine();
     idleTimer = setTimeout(function () {
       interacting = false;
       fieldDirty = presentDirty = true;
       schedule();
+      startRefine();
     }, 160);
   }
 
   host.addEventListener('pointerdown', function (e) {
+    if (S.autoDir) { stopAuto(); }
     host.setPointerCapture(e.pointerId);
     pointers.set(e.pointerId, localPos(e));
     if (pointers.size === 2) {
@@ -3113,12 +5236,37 @@ details[open] summary::before { content: "\2212 "; }
   });
   host.addEventListener('contextmenu', function (e) { e.preventDefault(); });
 
+  var wheelHist = [], flickCooldown = 0;
   host.addEventListener('wheel', function (e) {
     e.preventDefault();
     var p = localPos(e);
+    cursor = p;
     var unit = e.deltaMode === 1 ? 16 : (e.deltaMode === 2 ? Hc : 1);
-    var f = Math.exp(-e.deltaY * unit * 0.0018);
-    zoomAt(p.x, p.y, clamp(f, 0.2, 5));
+    var amount = e.deltaY * unit;
+
+    /* A flick is several fast notches the same way inside a short window. */
+    /* A flick is a burst of fast notches the same way. Trackpads emit many
+       small deltas, so the bar is set by total distance in a short window
+       rather than by event count alone, and a cooldown stops it retriggering
+       on the tail of the same gesture. */
+    if (S.flickZoom && performance.now() > flickCooldown) {
+      var now = performance.now();
+      wheelHist = wheelHist.filter(function (w) { return now - w.t < 180; });
+      wheelHist.push({ t: now, d: amount });
+      var total = 0, sameWay = true, first = wheelHist[0].d;
+      for (var i = 0; i < wheelHist.length; i++) {
+        total += Math.abs(wheelHist[i].d);
+        if (wheelHist[i].d * first < 0) sameWay = false;
+      }
+      if (sameWay && wheelHist.length >= 3 && total >= 900) {
+        wheelHist = [];
+        flickCooldown = now + 500;
+        startAuto(amount < 0 ? 1 : -1, { x: p.x, y: p.y });
+        return;
+      }
+    }
+    if (S.autoDir) { stopAuto(); return; }
+    zoomAt(p.x, p.y, clamp(Math.exp(-amount * 0.0018), 0.2, 5));
     markInteracting();
   }, { passive: false });
 
@@ -3129,6 +5277,7 @@ details[open] summary::before { content: "\2212 "; }
 
   window.addEventListener('keydown', function (e) {
     if (/^(INPUT|SELECT|TEXTAREA)$/.test(document.activeElement.tagName)) return;
+    if (S.autoDir && e.key !== 'Escape') stopAuto();
     var step = 60;
     if (e.key === '+' || e.key === '=') zoomAt(Wc / 2, Hc / 2, 1.3);
     else if (e.key === '-' || e.key === '_') zoomAt(Wc / 2, Hc / 2, 1 / 1.3);
@@ -3137,6 +5286,7 @@ details[open] summary::before { content: "\2212 "; }
     else if (e.key === 'ArrowUp') panBy(0, step);
     else if (e.key === 'ArrowDown') panBy(0, -step);
     else if (e.key === '0') resetView(true);
+    else if (e.key === 'Escape') stopAuto();
     else if (e.key.toLowerCase() === 'c') { $('cycle').click(); }
     else if (e.key.toLowerCase() === 'l') { $('lines').click(); }
     else if (e.key.toLowerCase() === 'g') { $('grid').click(); }
@@ -3262,7 +5412,7 @@ details[open] summary::before { content: "\2212 "; }
     });
     pair('freq', function (v) {
       S.freq = v;
-      presentDirty = true; drawRail(); schedule();
+      presentDirty = true; drawRail(); refreshBandInfo(); schedule();
     });
     bind('cycle', 'change', function () {
       S.cycling = this.checked;
@@ -3333,6 +5483,7 @@ details[open] summary::before { content: "\2212 "; }
     bind('grid', 'change', function () { S.grid = this.checked; drawOverlay(); });
     bind('backend', 'change', function () {
       S.backendPref = this.value;
+      $('hybridHint').style.display = this.value === 'hybrid' ? '' : 'none';
       ensureBackend();
       updateReadout();
       fieldDirty = presentDirty = true; schedule();
@@ -3349,6 +5500,168 @@ details[open] summary::before { content: "\2212 "; }
       fieldDirty = presentDirty = true; schedule();
     });
 
+    wireTabs();
+
+    /* --- function library --- */
+    bind('defList', 'change', function () {
+      $('defEdit').value = S.defs[this.selectedIndex] || '';
+      if (S.useLibrary) graphSelected();
+    });
+    bind('defAdd', 'click', function () {
+      var n = 'f';
+      var used = S.defs.map(function (d) { return (d.split('(')[0] || '').trim(); });
+      var i = 1;
+      while (used.indexOf(n) >= 0) { n = 'f' + (++i); }
+      S.defs.push(n + '(u, v) = sin(u) + v');
+      refreshDefList();
+      $('defList').selectedIndex = S.defs.length - 1;
+      $('defEdit').value = S.defs[S.defs.length - 1];
+      commitDefs();
+    });
+    bind('defDup', 'click', function () {
+      var i = $('defList').selectedIndex;
+      if (i < 0 || !S.defs[i]) return;
+      S.defs.push(S.defs[i].replace(/^\s*([A-Za-z_][A-Za-z0-9_]*)/, '$1copy'));
+      refreshDefList();
+      commitDefs();
+    });
+    bind('defDel', 'click', function () {
+      var i = $('defList').selectedIndex;
+      if (i < 0) return;
+      S.defs.splice(i, 1);
+      refreshDefList();
+      commitDefs();
+    });
+    bind('defEdit', 'input', function () {
+      var i = $('defList').selectedIndex;
+      if (i < 0) return;
+      S.defs[i] = this.value;
+      var opt = $('defList').options[i];
+      if (opt) opt.textContent = this.value;
+      commitDefs();
+    });
+    bind('useLibrary', 'change', function () {
+      S.useLibrary = this.checked;
+      if (this.checked) graphSelected();
+    });
+    pair('recDepth', function (v) {
+      S.recurseDepth = Math.round(v);
+      applyExpression($('exprField').value);
+    });
+    pair('recSeed', function (v) {
+      S.recurseSeed = v;
+      applyExpression($('exprField').value);
+    });
+
+    /* --- history --- */
+    bind('histBtn', 'click', function (e) {
+      e.stopPropagation();
+      var menu = $('histMenu');
+      if (menu.classList.contains('on')) menu.classList.remove('on');
+      else showHistory();
+    });
+    document.addEventListener('click', function (e) {
+      var menu = $('histMenu');
+      if (!menu || !menu.classList.contains('on')) return;
+      if (e.target === $('histBtn') || menu.contains(e.target)) return;
+      menu.classList.remove('on');
+    });
+
+    /* --- view --- */
+    pair('gridAlpha', function (v) { S.gridAlpha = v; overlayDirty = true; drawOverlay(); });
+    bind('boldAxes', 'change', function () { S.boldAxes = this.checked; drawOverlay(); });
+    bind('reticle', 'change', function () { S.reticle = this.checked; drawOverlay(); });
+    bind('scaleNote', 'change', function () { S.scaleNote = this.checked; updateReadout(); });
+
+    /* --- auto zoom --- */
+    bind('autoIn', 'click', function () { startAuto(S.autoDir > 0 ? 0 : 1, null); });
+    bind('autoOut', 'click', function () { startAuto(S.autoDir < 0 ? 0 : -1, null); });
+    bind('autoStop', 'click', stopAuto);
+    pair('autoSpeed', function (v) { S.autoSpeed = v; });
+    bind('autoToCursor', 'change', function () { S.autoToCursor = this.checked; });
+    bind('flickZoom', 'change', function () { S.flickZoom = this.checked; });
+
+    /* --- colour --- */
+    bind('cycleRev', 'change', function () { S.cycleReverse = this.checked; });
+    bind('freqMode', 'change', function () {
+      S.freqMode = parseInt(this.value, 10) || 0;
+      presentDirty = true; drawRail(); refreshBandInfo(); schedule();
+    });
+
+    /* --- effects --- */
+    bind('postKernel', 'change', function () {
+      S.postKernel = parseInt(this.value, 10); presentDirty = true; schedule();
+    });
+    bind('postDither', 'change', function () {
+      S.postDither = parseInt(this.value, 10); presentDirty = true; schedule();
+    });
+    pair('postKernelAmt', function (v) { S.postKernelAmt = v; presentDirty = true; schedule(); });
+    pair('postDitherAmt', function (v) { S.postDitherAmt = v; presentDirty = true; schedule(); });
+    pair('postLevels', function (v) { S.postLevels = Math.round(v); presentDirty = true; schedule(); });
+    pair('postGrain', function (v) { S.postGrain = v; presentDirty = true; schedule(); });
+    pair('postScan', function (v) { S.postScan = v; presentDirty = true; schedule(); });
+    pair('postVignette', function (v) { S.postVignette = v; presentDirty = true; schedule(); });
+
+    /* --- output size, shared by the image and the video --- */
+    RATIOS.forEach(function (r) {
+      var o = document.createElement('option');
+      o.value = r.id; o.textContent = r.name;
+      $('outRatio').appendChild(o);
+    });
+    $('outRatio').value = 'screen';
+    var pOpt = document.createElement('option');
+    pOpt.value = ''; pOpt.textContent = 'Choose a size\u2026';
+    $('outPreset').appendChild(pOpt);
+    RES_PRESETS.forEach(function (r, i) {
+      var o = document.createElement('option');
+      o.value = String(i); o.textContent = r.name;
+      $('outPreset').appendChild(o);
+    });
+    bind('outRatio', 'change', function () {
+      if (this.value !== 'custom') applyLock('w');
+      else refreshOutInfo();
+    });
+    bind('outPreset', 'change', function () {
+      var r = RES_PRESETS[parseInt(this.value, 10)];
+      if (!r) return;
+      setOutSize(r.w, r.h);
+      /* pick the aspect entry that matches, so the lock keeps behaving */
+      var want = r.w / r.h, best = 'custom';
+      RATIOS.forEach(function (x) {
+        if (x.v && Math.abs(x.v - want) < 0.01) best = x.id;
+      });
+      $('outRatio').value = best;
+      refreshOutInfo();
+    });
+    bind('outW', 'input', function () { applyLock('w'); });
+    bind('outH', 'input', function () { applyLock('h'); });
+    bind('outWr', 'input', function () { $('outW').value = this.value; applyLock('w'); });
+    bind('outHr', 'input', function () { $('outH').value = this.value; applyLock('h'); });
+    bind('outLock', 'change', function () { if (this.checked) applyLock('w'); });
+
+    /* --- video --- */
+    pair('vidSecs', refreshVidWarn);
+    pair('vidZoom', function () { });
+    pair('vidRate', refreshVidWarn);
+    bind('vidFps', 'change', refreshVidWarn);
+    bind('vidUseSize', 'change', refreshVidWarn);
+    bind('vidFormat', 'change', function () {
+      var fm = VIDEO_FORMATS[this.value];
+      $('vidRateRow').style.display = (fm && !fm.lossless) ? '' : 'none';
+      refreshVidWarn();
+    });
+    bind('vidStop', 'click', function () { abortRec = true; });
+    bind('vidMode', 'change', function () {
+      $('vidZoomRow').style.display = this.value === 'zoom' ? '' : 'none';
+    });
+    bind('record', 'click', recordVideo);
+    bind('setSave', 'click', saveSettings);
+    bind('setLoad', 'click', function () { $('setFile').click(); });
+    bind('setFile', 'change', function () {
+      if (this.files && this.files[0]) loadSettings(this.files[0]);
+      this.value = '';
+    });
+
     bind('navBox', 'click', function () { setNav('box'); });
     bind('navPan', 'click', function () { setNav('pan'); });
     bind('reset', 'click', function () { resetView(true); });
@@ -3358,8 +5671,91 @@ details[open] summary::before { content: "\2212 "; }
     });
     bind('preview', 'click', function () {
       previewTeX = !previewTeX;
-      if (S.ast) updatePreview(S.ast);
+      if (S.ast) updatePreview(S.ast, S.flat);
     });
+  }
+
+  /* ------------------------------------------------------------- tabs */
+  function wireTabs() {
+    var btns = Array.prototype.slice.call(document.querySelectorAll('#tabs button'));
+    btns.forEach(function (b) {
+      b.addEventListener('click', function () {
+        var want = b.getAttribute('data-tab');
+        btns.forEach(function (o) { o.classList.toggle('on', o === b); });
+        Array.prototype.forEach.call(document.querySelectorAll('.tab'), function (pane) {
+          pane.classList.toggle('on', pane.getAttribute('data-tab') === want);
+        });
+      });
+    });
+  }
+
+  /* -------------------------------------------------- function library */
+  function refreshDefList() {
+    var sel = $('defList');
+    var keep = sel.selectedIndex;
+    sel.textContent = '';
+    S.defs.forEach(function (text, i) {
+      var o = document.createElement('option');
+      o.value = String(i);
+      o.textContent = text;
+      sel.appendChild(o);
+    });
+    if (S.defs.length) sel.selectedIndex = clamp(keep < 0 ? 0 : keep, 0, S.defs.length - 1);
+    $('defEditRow').style.display = S.defs.length ? '' : 'none';
+    if (S.defs.length) $('defEdit').value = S.defs[sel.selectedIndex] || '';
+    $('useLibrary').disabled = !S.defs.length;
+  }
+
+  function commitDefs() {
+    var errs = rebuildDefs();
+    var el = $('defErr');
+    if (errs.length) {
+      el.textContent = errs.map(function (e) {
+        return (S.defs[e.i] || '').split('=')[0].trim() + ': ' + e.msg;
+      }).join('  \u00b7  ');
+      el.classList.add('on');
+    } else {
+      el.textContent = '';
+      el.classList.remove('on');
+    }
+    applyExpression($('exprField').value);
+  }
+
+  function graphSelected() {
+    var d = S.defAsts[$('defList').selectedIndex];
+    if (!d) return;
+    var call = d.params.length === 0 ? d.name + '()'
+      : d.name + '(' + ['x', 'y', '0'].slice(0, d.params.length).join(', ') + ')';
+    $('exprField').value = call;
+    applyExpression(call);
+    syncPresetMenu();
+  }
+
+  /* ---------------------------------------------------------- history */
+  function showHistory() {
+    var menu = $('histMenu');
+    menu.textContent = '';
+    if (!S.history.length) {
+      var p2 = document.createElement('div');
+      p2.className = 'empty';
+      p2.textContent = 'No formulas yet. Anything you type that is not a template lands here.';
+      menu.appendChild(p2);
+    } else {
+      S.history.forEach(function (h) {
+        var b = document.createElement('button');
+        b.type = 'button';
+        b.textContent = h;
+        b.title = h;
+        b.addEventListener('click', function () {
+          $('exprField').value = h;
+          applyExpression(h);
+          syncPresetMenu();
+          menu.classList.remove('on');
+        });
+        menu.appendChild(b);
+      });
+    }
+    menu.classList.add('on');
   }
 
   function setNav(m) {
@@ -3369,33 +5765,658 @@ details[open] summary::before { content: "\2212 "; }
     host.classList.toggle('pan', m === 'pan');
   }
 
-  function savePNG() {
-    fieldDirty = true; presentDirty = true;
-    if (S.fn) { R.renderField(); R.present(); fieldDirty = presentDirty = false; }
-    drawOverlay();
-    var out = document.createElement('canvas');
-    out.width = canvas.width; out.height = canvas.height;
-    var g = out.getContext('2d');
-    if (R.readPixels) {
-      var px = R.readPixels();
-      var id = g.createImageData(px.w, px.h);
-      var rowBytes = px.w * 4;
-      for (var y = 0; y < px.h; y++) {
-        var src = (px.h - 1 - y) * rowBytes;
-        id.data.set(px.data.subarray(src, src + rowBytes), y * rowBytes);
-      }
-      g.putImageData(id, 0, 0);
-    } else {
-      g.drawImage(canvas, 0, 0);
+  /* ---------------------------------------------------- output size */
+  var RATIOS = [
+    { id: 'screen', name: 'Match screen', v: 0 },
+    { id: '16:9', name: '16 : 9', v: 16 / 9 },
+    { id: '16:10', name: '16 : 10', v: 16 / 10 },
+    { id: '3:2', name: '3 : 2', v: 3 / 2 },
+    { id: '4:3', name: '4 : 3', v: 4 / 3 },
+    { id: '1:1', name: '1 : 1 square', v: 1 },
+    { id: '2:1', name: '2 : 1', v: 2 },
+    { id: '21:9', name: '21 : 9 ultrawide', v: 64 / 27 },
+    { id: '9:16', name: '9 : 16 portrait', v: 9 / 16 },
+    { id: 'custom', name: 'Custom', v: 0 }
+  ];
+  var RES_PRESETS = [
+    { name: '640 \u00d7 360', w: 640, h: 360 },
+    { name: '1280 \u00d7 720 (720p)', w: 1280, h: 720 },
+    { name: '1920 \u00d7 1080 (1080p)', w: 1920, h: 1080 },
+    { name: '2560 \u00d7 1440 (1440p)', w: 2560, h: 1440 },
+    { name: '3840 \u00d7 2160 (4K UHD)', w: 3840, h: 2160 },
+    { name: '4096 \u00d7 2160 (DCI 4K)', w: 4096, h: 2160 },
+    { name: '7680 \u00d7 4320 (8K UHD)', w: 7680, h: 4320 },
+    { name: '1080 \u00d7 1080 square', w: 1080, h: 1080 },
+    { name: '2048 \u00d7 2048 square', w: 2048, h: 2048 },
+    { name: '4096 \u00d7 4096 square', w: 4096, h: 4096 },
+    { name: '1080 \u00d7 1920 portrait', w: 1080, h: 1920 },
+    { name: '2560 \u00d7 1080 ultrawide', w: 2560, h: 1080 }
+  ];
+
+  function currentRatio() {
+    var sel = $('outRatio');
+    var r = RATIOS.filter(function (x) { return x.id === sel.value; })[0] || RATIOS[0];
+    if (r.id === 'screen') return Math.max(0.05, Wc / Math.max(1, Hc));
+    if (r.id === 'custom') {
+      return outSize().w / Math.max(1, outSize().h);
     }
-    g.drawImage(overlay, 0, 0);
-    out.toBlob(function (blob) {
-      var a = document.createElement('a');
-      a.href = URL.createObjectURL(blob);
-      a.download = 'ocg-' + Date.now() + '.png';
-      a.click();
-      setTimeout(function () { URL.revokeObjectURL(a.href); }, 4000);
+    return r.v;
+  }
+  function outSize() {
+    return {
+      w: clamp(Math.round(parseFloat($('outW').value) || 1920), 16, 16384),
+      h: clamp(Math.round(parseFloat($('outH').value) || 1080), 16, 16384)
+    };
+  }
+  function setOutSize(w, h) {
+    w = clamp(Math.round(w), 16, 16384);
+    h = clamp(Math.round(h), 16, 16384);
+    $('outW').value = String(w); $('outH').value = String(h);
+    $('outWr').value = String(clamp(w, 256, 7680));
+    $('outHr').value = String(clamp(h, 256, 4320));
+    refreshOutInfo();
+  }
+  function gcdInt(a, b) { while (b) { var t = a % b; a = b; b = t; } return a || 1; }
+  function refreshBandInfo() {
+    var el = $('bandInfo');
+    if (!el) return;
+    var px = bandPixels();
+    if (!isFinite(px)) { el.textContent = '\u2014'; return; }
+    el.textContent = 'band \u2248 ' +
+      (px >= 1e5 || px < 1e-2 ? px.toExponential(2) : px.toPrecision(3)) + ' px';
+  }
+
+  function refreshOutInfo() {
+    var o = outSize();
+    var g = gcdInt(o.w, o.h);
+    var mp = (o.w * o.h / 1e6);
+    var tiles = Math.ceil(o.w / 1024) * Math.ceil(o.h / 1024);
+    $('outInfo').textContent = (o.w / g) + ':' + (o.h / g) + '  \u00b7  ' +
+      mp.toFixed(1) + ' MP  \u00b7  ' + tiles + ' tile' + (tiles === 1 ? '' : 's');
+    refreshVidWarn();
+  }
+  function applyLock(changed) {
+    if (!$('outLock').checked) { refreshOutInfo(); return; }
+    var o = outSize(), r = currentRatio();
+    if (changed === 'h') setOutSize(o.h * r, o.h);
+    else setOutSize(o.w, o.w / r);
+  }
+
+  /* Rough size estimate, since a lossless clip can be very large. */
+  function refreshVidWarn() {
+    var el = $('vidWarn');
+    if (!el) return;
+    var o = vidSize();
+    var frames = Math.max(2, Math.round(
+      (parseFloat($('vidSecs').value) || 6) * (parseInt($('vidFps').value, 10) || 30)));
+    var kind = $('vidFormat').value;
+    var txt;
+    if (VIDEO_FORMATS[kind] && !VIDEO_FORMATS[kind].lossless) {
+      var mb = (parseFloat($('vidRate').value) || 120) *
+        (parseFloat($('vidSecs').value) || 6) / 8;
+      txt = frames + ' frames \u00b7 roughly ' + mb.toFixed(0) + ' MB';
+    } else {
+      /* PNG of this sort of image lands near 1.5 bits per pixel */
+      var bytes = o.w * o.h * 0.19 * frames;
+      txt = frames + ' lossless frames \u00b7 roughly ' +
+        (bytes / 1048576 > 1024 ? (bytes / 1073741824).toFixed(1) + ' GB'
+          : (bytes / 1048576).toFixed(0) + ' MB');
+    }
+    el.textContent = txt;
+  }
+  function vidSize() {
+    if ($('vidUseSize') && $('vidUseSize').checked) return outSize();
+    return { w: Math.round(Wc), h: Math.round(Hc) };
+  }
+
+  /* --------------------------------------------------------- export */
+  function download(blob, name) {
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = name;
+    a.click();
+    setTimeout(function () { URL.revokeObjectURL(a.href); }, 8000);
+  }
+
+  /* Renders at any size by walking tiles through the same pipeline, so the
+     output is not capped by the window or by the GPU's texture limit. */
+  /* Renders at any size by walking tiles through the same pipeline, so the
+     output is not capped by the window or the GPU's texture limit. Cosmetic
+     sizes (contour width, scanlines, grid weight) scale with the image so a
+     large export looks like the screen rather than a hairline version of it. */
+  /* An exporter owns ONE renderer for its whole life. Building a WebGL
+     context per frame would create hundreds during a recording, and browsers
+     keep only a handful alive before dropping the oldest. */
+  function createExporter() {
+    var cvs = document.createElement('canvas');
+    var rr = null, tmp = null, disposed = false;
+
+    var useGPU = backend === 'gpu' || backend === 'hybrid';
+    if (useGPU) {
+      try { rr = createGPU(cvs); } catch (e) { rr = null; }
+      if (rr && S.glsl) {
+        try { rr.setExpr(S.glsl); }
+        catch (e2) { if (rr.destroy) rr.destroy(); rr = null; }
+      }
+    }
+    if (!rr) { cvs = document.createElement('canvas'); rr = createCPU(cvs); }
+
+    function render(outW, outH, withGuides, onTile) {
+      if (disposed) throw new Error('exporter already disposed');
+      var out = document.createElement('canvas');
+      out.width = outW; out.height = outH;
+      var g = out.getContext('2d');
+
+      var saved = {
+        dpr: dpr, Wc: Wc, Hc: Hc, ppu: S.ppu,
+        lineW: S.lineW, scan: S.postScan, grain: S.postGrain
+      };
+      var scale = outW / Math.max(1, saved.Wc);
+      var tile = 1024;
+      try {
+        dpr = 1;
+        S.ppu = saved.ppu * scale;       // same world span across the width
+        Wc = outW; Hc = outH;
+        S.lineW = saved.lineW * scale;   // contours keep their apparent weight
+        var tilesX = Math.ceil(outW / tile), tilesY = Math.ceil(outH / tile);
+        var done = 0;
+
+        for (var oy = 0; oy < outH; oy += tile) {
+          for (var ox = 0; ox < outW; ox += tile) {
+            var tw = Math.min(tile, outW - ox), th = Math.min(tile, outH - oy);
+            cvs.width = tw; cvs.height = th;
+            /* gl_FragCoord counts up from the bottom, so the origin does too */
+            if (rr.setTile) rr.setTile(ox, outH - oy - th, outW, outH);
+            if (rr.resize) rr.resize();
+            rr.renderField();
+            rr.present();
+            if (rr.readPixels) {
+              var px = rr.readPixels();
+              if (!tmp || tmp.width !== px.w || tmp.height !== px.h) {
+                tmp = document.createElement('canvas');
+                tmp.width = px.w; tmp.height = px.h;
+              }
+              var tg = tmp.getContext('2d');
+              var id = tg.createImageData(px.w, px.h);
+              var rowBytes = px.w * 4;
+              for (var yy = 0; yy < px.h; yy++) {
+                var src = (px.h - 1 - yy) * rowBytes;
+                id.data.set(px.data.subarray(src, src + rowBytes), yy * rowBytes);
+              }
+              tg.putImageData(id, 0, 0);
+              g.drawImage(tmp, ox, oy);
+            } else {
+              g.drawImage(cvs, ox, oy);
+            }
+            if (onTile) onTile(++done, tilesX * tilesY);
+          }
+        }
+        if (rr.setTile) rr.setTile(0, 0, 0, 0);
+        if (withGuides) drawGrid(g, outW, outH, Math.max(1, scale));
+      } finally {
+        dpr = saved.dpr; Wc = saved.Wc; Hc = saved.Hc;
+        S.ppu = saved.ppu; S.lineW = saved.lineW;
+        S.postScan = saved.scan; S.postGrain = saved.grain;
+      }
+      return out;
+    }
+
+    return {
+      render: render,
+      usesGPU: rr.kind === 'gpu',
+      dispose: function () {
+        if (disposed) return;
+        disposed = true;
+        if (rr && rr.destroy) rr.destroy();
+        rr = null; tmp = null;
+        fieldDirty = presentDirty = overlayDirty = true;
+        schedule();
+      }
+    };
+  }
+
+  /* One-shot convenience for a single image. */
+  function renderToCanvas(outW, outH, withGuides, onTile) {
+    var ex = createExporter();
+    try { return ex.render(outW, outH, withGuides, onTile); }
+    finally { ex.dispose(); }
+  }
+
+  function savePNG() {
+    var o = outSize(), w = o.w, h = o.h;
+    note('Rendering ' + w + '\u00d7' + h + '\u2026');
+    setTimeout(function () {
+      var out;
+      try { out = renderToCanvas(w, h, $('outGuides').checked); }
+      catch (e) { note('That size was too large to render here.'); return; }
+      out.toBlob(function (blob) {
+        if (!blob) { note('Could not encode the image.'); return; }
+        download(blob, 'ocg-' + w + 'x' + h + '-' + Date.now() + '.png');
+        note('Saved ' + w + '\u00d7' + h + '.');
+      });
+    }, 30);
+  }
+
+  /* ------------------------------------------------------- settings */
+  function saveSettings() {
+    var o = outSize();
+    var json = CFG.serialize(S, {
+      history: S.history, defs: S.defs,
+      outW: o.w, outH: o.h,
+      outRatio: $('outRatio').value,
+      outLock: $('outLock').checked,
+      outGuides: $('outGuides').checked,
+      vidFormat: $('vidFormat').value,
+      vidSecs: parseFloat($('vidSecs').value),
+      vidFps: parseInt($('vidFps').value, 10),
+      vidRate: parseFloat($('vidRate').value),
+      vidMode: $('vidMode').value,
+      vidZoom: parseFloat($('vidZoom').value),
+      vidUseSize: $('vidUseSize').checked
     });
+    download(new Blob([json], { type: 'application/json' }), 'ocg-settings.json');
+    note('Settings saved.');
+  }
+
+  function loadSettings(file) {
+    var fr = new FileReader();
+    fr.onload = function () {
+      var res = CFG.parse(String(fr.result));
+      var n = 0;
+      for (var k in res.values) { S[k] = res.values[k]; n++; }
+      /* files written before the three-mode control carried a boolean */
+      if (res.values.freqMode === undefined &&
+        typeof res.values.freqFollowsZoom === 'boolean') {
+        S.freqMode = res.values.freqFollowsZoom ? 1 : 0;
+      }
+      if (!n) { note(res.warnings[0] || 'Nothing usable in that file.'); return; }
+      rebuildDefs();
+      refreshDefList();
+      syncControlsFromState();
+      applyExpression(S.expr);
+      viewChanged();
+      drawRail();
+      drawOverlay();
+      note(res.warnings.length
+        ? 'Loaded, with ' + res.warnings.length + ' setting(s) ignored.'
+        : 'Settings loaded.');
+    };
+    fr.readAsText(file);
+  }
+
+  /* ---------------------------------------------------------- video */
+  /* ---------------------------------------------------------- video */
+  /* Frames are produced one at a time and pushed by hand, so a frame that
+     takes a second to render still lands in the right place. That also lets
+     the lossless paths reuse the very same frames the renderer produced. */
+  var recording = false, abortRec = false;
+
+  function recordVideo() {
+    if (recording) { abortRec = true; return; }
+    var fmtKind = $('vidFormat').value;
+    var secs = clamp(parseFloat($('vidSecs').value) || 6, 1, 30);
+    var fps = parseInt($('vidFps').value, 10) || 30;
+    var frames = Math.max(2, Math.round(secs * fps));
+    var mode = $('vidMode').value;
+    var size = vidSize();
+    var status = $('vidStatus');
+
+    var encoded = VIDEO_FORMATS[fmtKind] && !VIDEO_FORMATS[fmtKind].lossless;
+    if (encoded && (!document.createElement('canvas').captureStream || !supportedMime(fmtKind))) {
+      note('This browser cannot record ' + VIDEO_FORMATS[fmtKind].name +
+        '. The lossless formats still work.');
+      return;
+    }
+
+    var saved = { phase: S.phase, ppu: S.ppu, cx: S.cx, cy: S.cy, cycling: S.cycling };
+    var zoomFactor = clamp(parseFloat($('vidZoom').value) || 16, 1.01, 1e6);
+    var aim = (S.autoToCursor && cursor) ? { x: cursor.x, y: cursor.y }
+      : { x: Wc / 2, y: Hc / 2 };
+    var startPpu = S.ppu;
+
+    S.cycling = false;
+    recording = true; abortRec = false;
+    $('record').textContent = 'Cancel';
+    $('vidStop').style.display = '';
+
+    /* Positions the view for frame i and hands back a finished canvas. */
+    var exporter = createExporter();
+
+    function drawFrame(i) {
+      var u = i / frames;                       // never reaches 1, so it loops
+      S.phase = u;
+      if (mode === 'zoom') {
+        S.cx = saved.cx; S.cy = saved.cy; S.ppu = startPpu;
+        var before = worldFromCss(aim.x, aim.y);
+        S.ppu = startPpu * Math.pow(zoomFactor, u);
+        var after = worldFromCss(aim.x, aim.y);
+        S.cx += before.x - after.x;
+        S.cy += before.y - after.y;
+      }
+      return exporter.render(size.w, size.h, false);
+    }
+
+    function finish(blob, name, msg) {
+      exporter.dispose();
+      if (blob) download(blob, name);
+      S.phase = saved.phase; S.ppu = saved.ppu;
+      S.cx = saved.cx; S.cy = saved.cy; S.cycling = saved.cycling;
+      recording = false;
+      $('record').textContent = 'Record';
+      $('vidStop').style.display = 'none';
+      status.textContent = msg;
+      fieldDirty = presentDirty = true;
+      schedule();
+    }
+
+    if (encoded) {
+      recordEncoded(fmtKind, frames, fps, size, drawFrame, finish, status);
+    } else {
+      recordLossless(fmtKind, frames, fps, drawFrame, finish, status);
+    }
+  }
+
+  /* Which containers this browser will actually record. MP4 needs an H.264
+     encoder, which Chrome and Safari expose but Firefox does not, so the
+     option is offered only where it works rather than failing on the click. */
+  var VIDEO_FORMATS = {
+    apng: { label: 'APNG \u2014 lossless, loops', lossless: true },
+    zip: { label: 'PNG frames \u2014 lossless, .zip', lossless: true },
+    mp4: {
+      label: 'MP4 \u2014 H.264, compressed', ext: 'mp4', name: 'MP4',
+      mimes: ['video/mp4;codecs=avc1.640028', 'video/mp4;codecs=avc1.4d002a',
+        'video/mp4;codecs=avc1.42E01E', 'video/mp4;codecs=av01.0.05M.08',
+        'video/mp4']
+    },
+    webm: {
+      label: 'WebM \u2014 VP9, compressed', ext: 'webm', name: 'WebM',
+      mimes: ['video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm']
+    }
+  };
+
+  function supportedMime(id) {
+    var f = VIDEO_FORMATS[id];
+    if (!f || !f.mimes) return null;
+    if (typeof MediaRecorder === 'undefined' || !MediaRecorder.isTypeSupported) return null;
+    for (var i = 0; i < f.mimes.length; i++) {
+      if (MediaRecorder.isTypeSupported(f.mimes[i])) return f.mimes[i];
+    }
+    return null;
+  }
+
+  /* Grey out what this browser cannot write, and say so on the option. */
+  function refreshVideoFormats() {
+    var sel = $('vidFormat');
+    if (!sel) return;
+    var canStream = !!document.createElement('canvas').captureStream;
+    Array.prototype.forEach.call(sel.options, function (opt) {
+      var f = VIDEO_FORMATS[opt.value];
+      if (!f || f.lossless) return;
+      var ok = canStream && !!supportedMime(opt.value);
+      opt.disabled = !ok;
+      opt.textContent = f.label + (ok ? '' : ' \u2014 not in this browser');
+    });
+    if (sel.selectedOptions && sel.selectedOptions[0] && sel.selectedOptions[0].disabled) {
+      sel.value = 'apng';
+    }
+  }
+
+  function recordEncoded(id, frames, fps, size, drawFrame, finish, status) {
+    var f = VIDEO_FORMATS[id];
+    var mime = supportedMime(id);
+    var host2 = document.createElement('canvas');
+    host2.width = size.w; host2.height = size.h;
+    var hctx = host2.getContext('2d');
+    var stream = host2.captureStream(0);
+    var track = stream.getVideoTracks()[0];
+    var rate = Math.round((parseFloat($('vidRate').value) || 120) * 1e6);
+    var rec;
+    try {
+      rec = new MediaRecorder(stream, {
+        mimeType: mime || undefined,
+        videoBitsPerSecond: rate
+      });
+    } catch (e) {
+      note(f.name + ' recording is not available here.');
+      finish(null, '', '');
+      return;
+    }
+    var chunks = [];
+    rec.ondataavailable = function (e) { if (e.data && e.data.size) chunks.push(e.data); };
+    rec.onstop = function () {
+      finish(new Blob(chunks, { type: mime || ('video/' + f.ext) }),
+        'ocg-' + size.w + 'x' + size.h + '-' + Date.now() + '.' + f.ext,
+        'Saved ' + frames + ' frames as ' + f.name + '.');
+    };
+    rec.start();
+    var i = 0;
+    function step() {
+      if (abortRec || i >= frames) {
+        setTimeout(function () {
+          try { rec.stop(); } catch (e) { finish(null, '', 'Cancelled.'); }
+        }, 60);
+        return;
+      }
+      var c = drawFrame(i);
+      hctx.drawImage(c, 0, 0);
+      if (track.requestFrame) track.requestFrame();
+      else if (stream.requestFrame) stream.requestFrame();
+      status.textContent = 'Frame ' + (i + 1) + ' of ' + frames;
+      i++;
+      requestAnimationFrame(step);
+    }
+    requestAnimationFrame(step);
+  }
+
+
+  /* PNG per frame, then either an APNG or a stored ZIP. Nothing is
+     re-encoded, so the pixels are exactly what was rendered. */
+  function recordLossless(kind, frames, fps, drawFrame, finish, status) {
+    var pngs = [];
+    var i = 0;
+    function step() {
+      if (abortRec) { finish(null, '', 'Cancelled.'); return; }
+      if (i >= frames) { assemble(); return; }
+      var c = drawFrame(i);
+      status.textContent = 'Rendering frame ' + (i + 1) + ' of ' + frames;
+      c.toBlob(function (blob) {
+        if (!blob) { finish(null, '', 'Could not encode a frame.'); return; }
+        var fr = new FileReader();
+        fr.onload = function () {
+          pngs.push(new Uint8Array(fr.result));
+          i++;
+          requestAnimationFrame(step);
+        };
+        fr.readAsArrayBuffer(blob);
+      }, 'image/png');
+    }
+    function assemble() {
+      status.textContent = 'Assembling ' + pngs.length + ' frames\u2026';
+      setTimeout(function () {
+        try {
+          if (kind === 'apng') {
+            var bytes = ENC.apng(pngs, 1, fps, 0);
+            finish(new Blob([bytes], { type: 'image/apng' }),
+              'ocg-loop-' + Date.now() + '.png',
+              'Saved a lossless APNG of ' + pngs.length + ' frames.');
+          } else {
+            var files = pngs.map(function (d, n) {
+              return { name: 'frame' + String(n).padStart(5, '0') + '.png', data: d };
+            });
+            finish(new Blob([ENC.zip(files)], { type: 'application/zip' }),
+              'ocg-frames-' + Date.now() + '.zip',
+              'Saved ' + pngs.length + ' lossless PNG frames.');
+          }
+        } catch (e) {
+          finish(null, '', 'Could not assemble the file: ' + e.message);
+        }
+      }, 30);
+    }
+    requestAnimationFrame(step);
+  }
+
+
+
+  /* ------------------------------------------- push state into the UI */
+  /* Used after loading a settings file, so every control reflects what was
+     restored rather than what it happened to show before. */
+  function syncControlsFromState() {
+    var setV = function (id, v) { var el = $(id); if (el) el.value = String(v); };
+    var setC = function (id, v) { var el = $(id); if (el) el.checked = !!v; };
+    var setPair = function (id, v) {
+      setV(id, v); setV(id + 'Num', v);
+    };
+    setV('exprField', S.expr);
+    setV('palette', S.palette);
+    setV('colA', S.colA); setV('colB', S.colB);
+    setPair('bands', S.bands);
+    setPair('freq', S.freq);
+    setPair('phase', S.phase);
+    setPair('speed', S.cycleSpeed);
+    setPair('lineW', S.lineW);
+    setPair('tSpeed', S.timeSpeed);
+    setPair('gridAlpha', S.gridAlpha);
+    setPair('autoSpeed', S.autoSpeed);
+    setPair('recDepth', S.recurseDepth);
+    setPair('recSeed', S.recurseSeed);
+    setPair('postKernelAmt', S.postKernelAmt);
+    setPair('postDitherAmt', S.postDitherAmt);
+    setPair('postLevels', S.postLevels);
+    setPair('postGrain', S.postGrain);
+    setPair('postScan', S.postScan);
+    setPair('postVignette', S.postVignette);
+    setV('postKernel', S.postKernel);
+    setV('postDither', S.postDither);
+    setV('setKind', S.set); setV('setN', S.setN);
+    setV('cont', S.cont);
+    setV('ss', S.ss);
+    setV('backend', S.backendPref);
+    setC('cycle', S.cycling); setC('cycleRev', S.cycleReverse);
+    setV('freqMode', S.freqMode);
+    setC('lines', S.lines); setC('parity', S.parity);
+    setC('repair', S.repair); setC('markCont', S.markCont);
+    setC('aa', S.aa); setC('grid', S.grid);
+    setC('boldAxes', S.boldAxes); setC('reticle', S.reticle);
+    setC('scaleNote', S.scaleNote);
+    if (S.outW && S.outH) setOutSize(S.outW, S.outH);
+    if (S.outRatio) setV('outRatio', S.outRatio);
+    if (typeof S.outLock === 'boolean') setC('outLock', S.outLock);
+    if (typeof S.outGuides === 'boolean') setC('outGuides', S.outGuides);
+    if (S.vidFormat) setV('vidFormat', S.vidFormat);
+    if (S.vidMode) setV('vidMode', S.vidMode);
+    if (S.vidFps) setV('vidFps', S.vidFps);
+    if (S.vidSecs) setPair('vidSecs', S.vidSecs);
+    if (S.vidRate) setPair('vidRate', S.vidRate);
+    if (S.vidZoom) setPair('vidZoom', S.vidZoom);
+    if (typeof S.vidUseSize === 'boolean') setC('vidUseSize', S.vidUseSize);
+    var vf = VIDEO_FORMATS[$('vidFormat').value];
+    $('vidRateRow').style.display = (vf && !vf.lossless) ? '' : 'none';
+    $('vidZoomRow').style.display = $('vidMode').value === 'zoom' ? '' : 'none';
+    refreshOutInfo();
+    $('speedRow').style.display = S.cycling ? '' : 'none';
+    $('lineOpts').style.display = S.lines ? '' : 'none';
+    $('duoRow').style.display = C.PALETTES[S.palette].duo ? '' : 'none';
+    $('bandRow').style.display = C.PALETTES[S.palette].id === 'bands' ? '' : 'none';
+    $('setN').style.display = SETS.SETS[S.set].param ? '' : 'none';
+    $('parityWrap').style.display = SETS.SETS[S.set].parity ? '' : 'none';
+    $('hybridHint').style.display = S.backendPref === 'hybrid' ? '' : 'none';
+    renderParamRows();
+  }
+
+  /* ==================================================================== */
+  /*  Hybrid refinement                                                   */
+  /* ==================================================================== */
+  /* The GPU draws instantly but in float32; the CPU is exact but slow. In
+     hybrid mode the GPU owns the interaction and, once the view settles, a
+     float64 pass is drawn in time-sliced bands over the top. Any movement
+     discards it, so you never look at a stale image. */
+  var refineCanvas = null, refineJob = null;
+
+  function ensureRefineCanvas() {
+    if (refineCanvas && refineCanvas.parentNode === host) return refineCanvas;
+    refineCanvas = document.createElement('canvas');
+    refineCanvas.id = 'refine';
+    refineCanvas.style.position = 'absolute';
+    refineCanvas.style.inset = '0';
+    refineCanvas.style.pointerEvents = 'none';
+    refineCanvas.style.opacity = '0';
+    host.insertBefore(refineCanvas, overlay);
+    return refineCanvas;
+  }
+
+  function cancelRefine() {
+    refineJob = null;
+    if (refineCanvas) refineCanvas.style.opacity = '0';
+  }
+
+  function startRefine() {
+    if (S.backendPref !== 'hybrid' || backend !== 'gpu' || !S.fn) return;
+    var cv2 = ensureRefineCanvas();
+    var w = Math.max(1, Math.round(Wc)), h = Math.max(1, Math.round(Hc));
+    if (cv2.width !== w || cv2.height !== h) { cv2.width = w; cv2.height = h; }
+    cv2.style.width = w + 'px'; cv2.style.height = h + 'px';
+    var ctx = cv2.getContext('2d');
+    refineJob = {
+      ctx: ctx, w: w, h: h, y: 0,
+      img: ctx.createImageData(w, 1),
+      row: new Float64Array(w),
+      upp: 1 / S.ppu, cx: S.cx, cy: S.cy, time: S.time,
+      token: ++refineToken
+    };
+    schedule();
+  }
+
+  var refineToken = 0;
+  function stepRefine(budgetMs) {
+    var job = refineJob;
+    if (!job || job.token !== refineToken) return;
+    var t0 = performance.now();
+    var mean = paletteMean(), lut = paletteLUT();
+    var freq = effFreq(), RT = C.RT;
+    RT.mode = S.cont;
+    var f = S.fn, P = S.params;
+
+    while (job.y < job.h) {
+      var j = job.y;
+      var rowVals = job.row;
+      var wy = job.cy + ((job.h - 1 - j) + 0.5 - job.h * 0.5) * job.upp;
+      for (var i = 0; i < job.w; i++) {
+        var wx = job.cx + (i + 0.5 - job.w * 0.5) * job.upp;
+        RT.cont = 0; RT.pole = 0;
+        rowVals[i] = f(wx, wy, job.time, Math.sqrt(wx * wx + wy * wy),
+          (wx === 0 && wy === 0) ? 0 : Math.atan2(wy, wx), P);
+      }
+      var d = job.img.data;
+      for (var q = 0; q < job.w; q++) {
+        var v = rowVals[q];
+        if (!(Math.abs(v) < C.BIG)) {
+          d[q * 4] = S.voidRGB[0] * 255; d[q * 4 + 1] = S.voidRGB[1] * 255;
+          d[q * 4 + 2] = S.voidRGB[2] * 255; d[q * 4 + 3] = 255;
+          continue;
+        }
+        var a1 = rowVals[q + 1 < job.w ? q + 1 : q], a0 = rowVals[q > 0 ? q - 1 : q];
+        var gw = Math.abs(a1 - a0) * (q > 0 && q + 1 < job.w ? 0.5 : 1);
+        var u = v * freq + S.phase; u -= Math.floor(u);
+        var li = (u * LUT_N) | 0; if (li >= LUT_N) li = LUT_N - 1;
+        li *= 3;
+        var cr = lut[li], cg = lut[li + 1], cb = lut[li + 2];
+        if (S.aa) {
+          var aa = clamp((gw * freq - 0.30) / 0.75, 0, 1);
+          aa = aa * aa * (3 - 2 * aa);
+          cr += (mean[0] - cr) * aa; cg += (mean[1] - cg) * aa; cb += (mean[2] - cb) * aa;
+        }
+        d[q * 4] = cr * 255; d[q * 4 + 1] = cg * 255; d[q * 4 + 2] = cb * 255; d[q * 4 + 3] = 255;
+      }
+      job.ctx.putImageData(job.img, 0, j);
+      job.y++;
+      if (performance.now() - t0 > budgetMs) break;
+    }
+    if (job.y >= job.h) {
+      refineCanvas.style.opacity = '1';
+      refineJob = null;
+    } else {
+      schedule();
+    }
   }
 
   /* ==================================================================== */
@@ -3403,6 +6424,7 @@ details[open] summary::before { content: "\2212 "; }
   /* ==================================================================== */
   function boot() {
     wireControls();
+    refreshDefList();
     /* adopt whatever the markup declares, so defaults live in one place */
     S.markCont = $('markCont').checked;
     S.repair = $('repair').checked;
@@ -3418,6 +6440,17 @@ details[open] summary::before { content: "\2212 "; }
     applyExpression(S.expr);
     syncPresetMenu();
     setNav('box');
+    refreshVideoFormats();
+    window.__refreshFormats = refreshVideoFormats;
+    setOutSize(1920, 1080);
+    applyLock('w');
+    S.gridAlpha = parseFloat($('gridAlpha').value);
+    S.boldAxes = $('boldAxes').checked;
+    S.reticle = $('reticle').checked;
+    S.autoSpeed = parseFloat($('autoSpeed').value);
+    S.autoToCursor = $('autoToCursor').checked;
+    S.flickZoom = $('flickZoom').checked;
+    S.postDither = parseInt($('postDither').value, 10);
     S.ppu = 84;
     drawRail();
     drawOverlay();
@@ -3435,4 +6468,3 @@ details[open] summary::before { content: "\2212 "; }
 </script>
 </body>
 </html>
-
